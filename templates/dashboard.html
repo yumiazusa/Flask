@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>项目立项管理系统</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --success: #27ae60;
+            --warning: #f39c12;
+            --danger: #e74c3c;
+            --info: #9b59b6;
+            --light: #ecf0f1;
+            --dark: #2c3e50;
+            --gray: #95a5a6;
+            --border: #dfe6e9;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        /* 头部样式 */
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 15px 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .header-left p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-details {
+            text-align: right;
+        }
+
+        .user-name {
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .user-department {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .logout-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 8px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        /* 统计卡片 */
+        .stats-container {
+            max-width: 1400px;
+            margin: 20px auto;
+            padding: 0 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            text-align: center;
+            border: 1px solid var(--border);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: var(--secondary);
+            margin: 10px 0;
+        }
+
+        .stat-label {
+            color: var(--gray);
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* 主容器 */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px 40px;
+        }
+
+        /* 卡片样式 */
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 3px 15px rgba(0,0,0,0.05);
+            border: 1px solid var(--border);
+        }
+
+        .card-title {
+            font-size: 20px;
+            color: var(--dark);
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-title .icon {
+            font-size: 24px;
+        }
+
+        /* 表单样式 */
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #34495e;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-group .required::after {
+            content: " *";
+            color: #e74c3c;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--secondary);
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        .form-group input[readonly] {
+            background-color: #f8f9fa;
+            color: var(--secondary);
+            font-weight: bold;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        /* 按钮样式 */
+        .btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--secondary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        /* 表格样式 */
+        .table-container {
+            overflow-x: auto;
+            margin-top: 15px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            min-width: 1200px;
+        }
+
+        .data-table th {
+            background: #f8f9fa;
+            padding: 14px 16px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--dark);
+            border-bottom: 2px solid var(--border);
+            white-space: nowrap; /* 表头不换行 */
+        }
+
+        .data-table td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+            word-break: break-word; /* 默认允许换行 */
+        }
+
+        .data-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .data-table tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        /* 特殊列样式：日期列不换行 */
+        .data-table td.no-wrap,
+        .data-table th.no-wrap {
+            white-space: nowrap;
+            min-width: 100px;
+        }
+
+        /* 项目号样式 - 不换行 */
+        .project-no {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: var(--secondary);
+            font-size: 15px;
+            white-space: nowrap;
+        }
+
+        /* 金额显示样式 - 不换行 */
+        .amount {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #27ae60;
+            white-space: nowrap;
+        }
+
+        /* 操作按钮组 */
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: nowrap; /* 操作按钮不换行 */
+            white-space: nowrap;
+        }
+
+        /* 消息提示 */
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-left: 4px solid;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border-color: #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border-color: #f5c6cb;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border-color: #bee5eb;
+        }
+
+        /* 规则说明 */
+        .rules-box {
+            margin-top: 25px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid var(--secondary);
+        }
+
+        .rules-title {
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: var(--dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 16px;
+        }
+
+        .rules-content {
+            color: #555;
+            font-size: 14px;
+        }
+
+        .rules-list {
+            margin: 10px 0 10px 20px;
+        }
+
+        .rules-list li {
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 50px 20px;
+            color: var(--gray);
+        }
+
+        .empty-state .icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+
+        .empty-state p {
+            font-size: 16px;
+        }
+
+        /* 模态框 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .modal-content h3 {
+            margin-bottom: 20px;
+            color: var(--dark);
+        }
+
+        /* 筛选器 */
+        .filter-container {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .filter-group label {
+            font-weight: 500;
+            color: #34495e;
+            font-size: 14px;
+        }
+
+        .filter-select {
+            padding: 8px 12px;
+            border: 2px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            min-width: 150px;
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+
+            .user-info {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .user-details {
+                text-align: center;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 0 15px 30px;
+            }
+
+            .card {
+                padding: 20px;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+                gap: 5px;
+            }
+
+            .filter-container {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 头部 -->
+    <div class="header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1>项目立项管理系统</h1>
+                <p>项目号规则：{{ project_year }}XXX0001</p>
+            </div>
+
+            <div class="user-info">
+                <div class="user-details">
+                    <div class="user-name">{{ user.realname }}</div>
+                    <div class="user-department">{{ user.department }}</div>
+                </div>
+                <button class="logout-btn" onclick="location.href='{{ url_for('logout') }}'">退出登录</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 统计信息 -->
+    {% if stats %}
+    <div class="stats-container">
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.total or 0 }}</div>
+            <div class="stat-label">总项目数</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.today or 0 }}</div>
+            <div class="stat-label">今日新增</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.month or 0 }}</div>
+            <div class="stat-label">本月新增</div>
+        </div>
+        {% for type_name, code in evaluation_types.items() %}
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.by_type.get(type_name, 0) }}</div>
+            <div class="stat-label">{{ type_name }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- 主内容 -->
+    <div class="container">
+        <!-- 消息提示 -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'error' if category == 'error' else category }}">
+                        {% if category == 'success' %}
+                            ✅
+                        {% elif category == 'error' %}
+                            ⚠️
+                        {% else %}
+                            ℹ️
+                        {% endif %}
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- 项目登记表单 -->
+        <div class="card">
+            <div class="card-title">
+                <span class="icon">📝</span>
+                <span>新建项目立项</span>
+            </div>
+
+            <form method="POST" action="{{ url_for('create_project') }}" id="projectForm">
+                <!-- 第一行：项目类型和项目号预览 -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="required">评估类型</label>
+                        <select name="project_type" required id="projectTypeSelect" onchange="updateProjectNoPreview()">
+                            <option value="">请选择评估类型</option>
+                            {% for type_name, code in evaluation_types.items() %}
+                            <option value="{{ type_name }}">{{ type_name }} ({{ code }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>项目号预览</label>
+                        <input type="text" id="projectNoPreview" readonly
+                               placeholder="选择评估类型后自动生成">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="required">项目名称</label>
+                        <input type="text" name="project_name" required
+                               placeholder="请输入项目名称" id="projectNameInput">
+                    </div>
+                </div>
+
+                <!-- 第二行：负责人和部门 -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="required">负责人</label>
+                        <input type="text" name="manager" required
+                               placeholder="请输入负责人姓名">
+                    </div>
+
+                    <div class="form-group">
+                        <label>所属部门</label>
+                        <select name="department">
+                            <option value="">请选择部门（可选）</option>
+                            <option value="业务1组（房地产）">业务1组（房地产）</option>
+                            <option value="业务2组（固定资产）">业务2组（固定资产）</option>
+                            <option value="业务3组（企业价值、无形资产）">业务3组（企业价值、无形资产）</option>
+                            <option value="质控部">质控部</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>预计收费金额（元）</label>
+                        <input type="number" name="estimated_fee"
+                               placeholder="0.00" step="0.01" min="0">
+                    </div>
+                </div>
+
+                <!-- 第三行：日期字段 -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>立项日期</label>
+                        <input type="date" name="project_date">
+                    </div>
+
+                    <div class="form-group">
+                        <label>评估基准日</label>
+                        <input type="date" name="base_date">
+                    </div>
+                </div>
+
+                <!-- 第四行：委托方名称 -->
+                <div class="form-group">
+                    <label class="required">委托方名称</label>
+                    <input type="text" name="client" required
+                           placeholder="请输入委托方名称">
+                </div>
+
+                <!-- 第五行：评估对象 -->
+                <div class="form-group">
+                    <label class="required">评估对象</label>
+                    <textarea name="evaluation_object" required rows="2"
+                              placeholder="请输入评估对象..."></textarea>
+                </div>
+
+                <!-- 第六行：评估范围 -->
+                <div class="form-group">
+                    <label class="required">评估范围</label>
+                    <textarea name="evaluation_scope" required rows="2"
+                              placeholder="请输入评估范围..."></textarea>
+                </div>
+
+                <!-- 第七行：经济行为目的 -->
+                <div class="form-group">
+                    <label class="required">经济行为目的</label>
+                    <textarea name="purpose" required rows="2"
+                              placeholder="请输入经济行为目的..."></textarea>
+                </div>
+
+                <div style="margin-top: 25px;">
+                    <button type="submit" class="btn btn-primary">
+                        <span>✅</span>
+                        <span>提交项目</span>
+                    </button>
+                    <button type="button" class="btn" onclick="clearForm()" style="margin-left: 10px;">
+                        <span>🗑️</span>
+                        <span>清空表单</span>
+                    </button>
+                </div>
+            </form>
+
+            <!-- 项目号规则说明 -->
+            <div class="rules-box">
+                <div class="rules-title">
+                    <span>📋</span>
+                    <span>项目号规则说明</span>
+                </div>
+                <div class="rules-content">
+                    <p><strong>格式：</strong>{{ project_year }} + 类型代码 + 4位序号</p>
+                    <p><strong>示例：</strong>{{ project_year }}AAP0001, {{ project_year }}LAP0001</p>
+                    <ul class="rules-list">
+                        <li><strong>固定年份：</strong>{{ project_year }}（固定不变）</li>
+                        <li><strong>类型代码：</strong>
+                            <ul style="margin-left: 20px; margin-top: 5px;">
+                                {% for type_name, code in evaluation_types.items() %}
+                                <li>{{ type_name }} → {{ code }}</li>
+                                {% endfor %}
+                            </ul>
+                        </li>
+                        <li><strong>序号规则：</strong>每种类型独立编号，从0001开始自动递增</li>
+                        <li><strong>注意事项：</strong>项目号生成后不可修改，请确认信息无误后再提交</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- 项目列表 -->
+        <div class="card">
+            <div class="card-title">
+                <span class="icon">📋</span>
+                <span>项目列表</span>
+                <span style="margin-left: auto; font-size: 14px; color: var(--gray);">
+                    共 {{ projects|length }} 个项目
+                </span>
+            </div>
+
+            <!-- 筛选器 -->
+            <div class="filter-container">
+                <div class="filter-group">
+                    <label>按类型筛选：</label>
+                    <select class="filter-select" onchange="filterByType(this.value)">
+                        <option value="">全部类型</option>
+                        {% for type_name, code in evaluation_types.items() %}
+                        <option value="{{ type_name }}">{{ type_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label>按部门筛选：</label>
+                    <select class="filter-select" onchange="filterByDepartment(this.value)">
+                        <option value="">全部部门</option>
+                        <option value="业务1组（房地产）">业务1组（房地产）</option>
+                        <option value="业务2组（固定资产）">业务2组（固定资产）</option>
+                        <option value="业务3组（企业价值、无形资产）">业务3组（企业价值、无形资产）</option>
+                        <option value="质控部">质控部</option>
+                    </select>
+                </div>
+
+                <div style="margin-left: auto;">
+                    <button class="btn" onclick="resetFilters()" style="padding: 8px 16px;">
+                        <span>🔄</span>
+                        <span>重置筛选</span>
+                    </button>
+                </div>
+            </div>
+
+            {% if projects %}
+            <div class="table-container">
+                <table class="data-table" id="projectTable">
+                    <thead>
+                        <tr>
+                            <th>项目号</th>
+                            <th>项目名称</th>
+                            <th>评估类型</th>
+                            <th>负责人</th>
+                            <th>部门</th>
+                            <th>预计收费</th>
+                            <th>委托方</th>
+                            <th class="no-wrap">立项日期</th>
+                            <th class="no-wrap">评估基准日</th>
+                            <th class="no-wrap">创建时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for project in projects %}
+                        <tr data-type="{{ project.project_type }}" data-department="{{ project.department or '' }}">
+                            <td>
+                                <span class="project-no">{{ project.project_no }}</span>
+                            </td>
+                            <td>{{ project.project_name }}</td>
+                            <td>{{ project.project_type }}</td>
+                            <td>{{ project.manager }}</td>
+                            <td>{{ project.department or '-' }}</td>
+                            <td>
+                                {% if project.estimated_fee and project.estimated_fee > 0 %}
+                                    <span class="amount">¥{{ "{:,.2f}".format(project.estimated_fee) }}</span>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>{{ project.client or '-' }}</td>
+                            <td class="no-wrap">{{ project.project_date or '-' }}</td>
+                            <td class="no-wrap">{{ project.base_date or '-' }}</td>
+                            <td class="no-wrap">{{ project.created_date }}</td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="btn btn-warning btn-sm" onclick="editProject({{ project.id }})">
+                                        <span>✏️</span>
+                                        <span>编辑</span>
+                                    </button>
+                                    <button class="btn btn-danger btn-sm" onclick="confirmDelete({{ project.id }}, '{{ project.project_no }}')">
+                                        <span>🗑️</span>
+                                        <span>删除</span>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="icon">📭</div>
+                <p>暂无项目，请创建第一个项目</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- 用户管理（仅管理员可见） -->
+        {% if user.username == 'admin' %}
+        <div class="card">
+            <div class="card-title">
+                <span class="icon">👥</span>
+                <span>用户管理</span>
+            </div>
+
+            <form method="POST" action="{{ url_for('add_user') }}">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="required">用户名</label>
+                        <input type="text" name="username" required
+                               placeholder="设置用户名">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="required">密码</label>
+                        <input type="password" name="password" required
+                               placeholder="设置密码">
+                    </div>
+
+                    <div class="form-group">
+                        <label>真实姓名</label>
+                        <input type="text" name="realname"
+                               placeholder="真实姓名">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>部门</label>
+                    <select name="department">
+                        <option value="">请选择部门（可选）</option>
+                        <option value="业务1组（房地产）">业务1组（房地产）</option>
+                        <option value="业务2组（固定资产）">业务2组（固定资产）</option>
+                        <option value="业务3组（企业价值、无形资产）">业务3组（企业价值、无形资产）</option>
+                        <option value="质控部">质控部</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-success">
+                    <span>➕</span>
+                    <span>添加用户</span>
+                </button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- 编辑项目模态框 -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <h3>编辑项目</h3>
+            <form method="POST" id="editForm">
+                <input type="hidden" id="editProjectId" name="project_id">
+
+                <div class="form-group">
+                    <label class="required">项目名称</label>
+                    <input type="text" id="editProjectName" name="project_name" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="required">负责人</label>
+                    <input type="text" id="editManager" name="manager" required>
+                </div>
+
+                <div class="form-group">
+                    <label>部门</label>
+                    <select id="editDepartment" name="department">
+                        <option value="">请选择部门（可选）</option>
+                        <option value="业务1组（房地产）">业务1组（房地产）</option>
+                        <option value="业务2组（固定资产）">业务2组（固定资产）</option>
+                        <option value="业务3组（企业价值、无形资产）">业务3组（企业价值、无形资产）</option>
+                        <option value="质控部">质控部</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>预计收费金额（元）</label>
+                    <input type="number" id="editEstimatedFee" name="estimated_fee" step="0.01" min="0">
+                </div>
+
+                <div class="form-group">
+                    <label>立项日期</label>
+                    <input type="date" id="editProjectDate" name="project_date">
+                </div>
+
+                <div class="form-group">
+                    <label>评估基准日</label>
+                    <input type="date" id="editBaseDate" name="base_date">
+                </div>
+
+                <div class="form-group">
+                    <label class="required">委托方名称</label>
+                    <input type="text" id="editClient" name="client" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="required">评估对象</label>
+                    <textarea id="editEvaluationObject" name="evaluation_object" rows="2" required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="required">评估范围</label>
+                    <textarea id="editEvaluationScope" name="evaluation_scope" rows="2" required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="required">经济行为目的</label>
+                    <textarea id="editPurpose" name="purpose" rows="2" required></textarea>
+                </div>
+
+                <div style="margin-top: 25px; text-align: right;">
+                    <button type="button" class="btn" onclick="closeModal()" style="margin-right: 10px;">
+                        <span>❌</span>
+                        <span>取消</span>
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <span>💾</span>
+                        <span>保存修改</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // 类型代码映射
+        const typeCodeMap = JSON.parse('{{ evaluation_types|tojson|safe }}');
+        const projectYear = '{{ project_year }}';
+
+        // 更新项目号预览
+        function updateProjectNoPreview() {
+            const select = document.getElementById('projectTypeSelect');
+            const preview = document.getElementById('projectNoPreview');
+            const selectedType = select.value;
+
+            if (selectedType && typeCodeMap[selectedType]) {
+                const code = typeCodeMap[selectedType];
+
+                // 调用API获取下一个项目号
+                fetch(`/api/next_project_no/${encodeURIComponent(selectedType)}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('网络响应错误');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.success) {
+                            preview.value = data.project_no;
+                            preview.style.color = '#3498db';
+                            preview.style.fontWeight = 'bold';
+                        } else {
+                            preview.value = `${projectYear}${code}XXXX`;
+                            preview.style.color = '#e74c3c';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('获取项目号失败:', error);
+                        preview.value = `${projectYear}${code}XXXX`;
+                        preview.style.color = '#e74c3c';
+                    });
+            } else {
+                preview.value = '';
+            }
+        }
+
+        // 编辑项目
+        function editProject(projectId) {
+            // 获取项目详情
+            fetch(`/api/project/${projectId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('网络响应错误');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        const project = data.project;
+
+                        // 填充表单
+                        document.getElementById('editProjectId').value = project.id;
+                        document.getElementById('editProjectName').value = project.project_name || '';
+                        document.getElementById('editManager').value = project.manager || '';
+                        document.getElementById('editDepartment').value = project.department || '';
+                        document.getElementById('editEstimatedFee').value = project.estimated_fee || '';
+                        document.getElementById('editProjectDate').value = project.project_date || '';
+                        document.getElementById('editBaseDate').value = project.base_date || '';
+                        document.getElementById('editClient').value = project.client || '';
+                        document.getElementById('editEvaluationObject').value = project.evaluation_object || '';
+                        document.getElementById('editEvaluationScope').value = project.evaluation_scope || '';
+                        document.getElementById('editPurpose').value = project.purpose || '';
+
+                        // 设置表单提交地址
+                        const form = document.getElementById('editForm');
+                        form.action = `/project/${projectId}/edit`;
+
+                        // 显示模态框
+                        document.getElementById('editModal').style.display = 'flex';
+                    } else {
+                        alert('获取项目信息失败: ' + (data.error || '未知错误'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('网络错误，请重试');
+                });
+        }
+
+        // 确认删除项目
+        function confirmDelete(projectId, projectNo) {
+            if (confirm(`确定要删除项目 ${projectNo} 吗？\n此操作不可恢复！`)) {
+                window.location.href = `/project/${projectId}/delete`;
+            }
+        }
+
+        // 关闭模态框
+        function closeModal() {
+            document.getElementById('editModal').style.display = 'none';
+        }
+
+        // 清空表单
+        function clearForm() {
+            if (confirm('确定要清空表单吗？所有未保存的内容将丢失。')) {
+                document.getElementById('projectForm').reset();
+                document.getElementById('projectNoPreview').value = '';
+                document.getElementById('projectNoPreview').style.color = '';
+            }
+        }
+
+        // 筛选项目 - 按类型
+        function filterByType(typeName) {
+            const rows = document.querySelectorAll('#projectTable tbody tr');
+
+            rows.forEach(row => {
+                const rowType = row.getAttribute('data-type');
+
+                if (!typeName) {
+                    // 显示所有
+                    row.style.display = '';
+                } else if (rowType === typeName) {
+                    // 显示匹配的类型
+                    row.style.display = '';
+                } else {
+                    // 隐藏不匹配的
+                    row.style.display = 'none';
+                }
+            });
+
+            updateVisibleCount();
+        }
+
+        // 筛选项目 - 按部门
+        function filterByDepartment(department) {
+            const rows = document.querySelectorAll('#projectTable tbody tr');
+
+            rows.forEach(row => {
+                const rowDepartment = row.getAttribute('data-department');
+
+                if (!department) {
+                    // 显示所有
+                    row.style.display = '';
+                } else if (rowDepartment === department) {
+                    // 显示匹配的部门
+                    row.style.display = '';
+                } else {
+                    // 隐藏不匹配的
+                    row.style.display = 'none';
+                }
+            });
+
+            updateVisibleCount();
+        }
+
+        // 重置筛选
+        function resetFilters() {
+            const rows = document.querySelectorAll('#projectTable tbody tr');
+            rows.forEach(row => {
+                row.style.display = '';
+            });
+
+            // 重置筛选下拉框
+            document.querySelector('select[onchange="filterByType(this.value)"]').value = '';
+            document.querySelector('select[onchange="filterByDepartment(this.value)"]').value = '';
+
+            updateVisibleCount();
+        }
+
+        // 更新可见项目数
+        function updateVisibleCount() {
+            const rows = document.querySelectorAll('#projectTable tbody tr');
+            const visibleRows = Array.from(rows).filter(row => row.style.display !== 'none');
+
+            // 可以在这里更新显示计数，如果需要的话
+            // console.log(`显示 ${visibleRows.length} 个项目`);
+        }
+
+        // 点击模态框外部关闭
+        window.onclick = function(event) {
+            const modal = document.getElementById('editModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        };
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 绑定事件
+            const typeSelect = document.getElementById('projectTypeSelect');
+            if (typeSelect) {
+                typeSelect.addEventListener('change', updateProjectNoPreview);
+            }
+
+            // 表单验证
+            const form = document.getElementById('projectForm');
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    const projectType = document.getElementById('projectTypeSelect').value;
+                    const projectName = document.getElementById('projectNameInput').value;
+
+                    if (!projectType) {
+                        e.preventDefault();
+                        alert('请选择评估类型！');
+                        return false;
+                    }
+
+                    if (!projectName) {
+                        e.preventDefault();
+                        alert('请填写项目名称！');
+                        return false;
+                    }
+
+                    // 验证必填字段
+                    const requiredFields = ['client', 'evaluation_object', 'evaluation_scope', 'purpose'];
+                    const fieldNames = {
+                        'client': '委托方名称',
+                        'evaluation_object': '评估对象',
+                        'evaluation_scope': '评估范围',
+                        'purpose': '经济行为目的'
+                    };
+
+                    for (const field of requiredFields) {
+                        const input = form.querySelector(`[name="${field}"]`);
+                        if (input && !input.value.trim()) {
+                            e.preventDefault();
+                            alert(`请填写${fieldNames[field]}！`);
+                            input.focus();
+                            return false;
+                        }
+                    }
+
+                    return true;
+                });
+            }
+
+            // 自动聚焦到项目类型选择框
+            const projectTypeSelect = document.getElementById('projectTypeSelect');
+            if (projectTypeSelect) {
+                projectTypeSelect.focus();
+            }
+
+            // 初始化可见项目数
+            updateVisibleCount();
+        });
+    </script>
+</body>
+</html>
