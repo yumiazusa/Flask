@@ -84,7 +84,7 @@ def create_database():
                            type_code VARCHAR
                        (
                            3
-                       ) COMMENT '类型代码：AAP、LAP、JAP、MRA、ACP',
+                       ) COMMENT '类型代码：AAP、LAP、JAP、MRV、ACP',
                            manager VARCHAR
                        (
                            100
@@ -92,7 +92,7 @@ def create_database():
                            department VARCHAR
                        (
                            100
-                       ) COMMENT '业务1组（房地产）、业务2组（固定资产）、业务3组（企业价值、无形资产）、质控部',
+                       ) COMMENT '业务1组（房地产）、业务2组（固定资产）、业务3组（企业价值）、质控部',
                            estimated_fee DECIMAL
                        (
                            18,
@@ -156,14 +156,14 @@ def create_test_projects(cursor):
         ('资产评估', 'AAP'),
         ('土地评估', 'LAP'),
         ('珠宝评估', 'JAP'),
-        ('矿业权评估', 'MRA'),
+        ('矿业权评估', 'MRV'),
         ('咨询', 'ACP')
     ]
 
     departments = [
         '业务1组（房地产）',
         '业务2组（固定资产）',
-        '业务3组（企业价值、无形资产）',
+        '业务3组（企业价值）',
         '质控部'
     ]
 

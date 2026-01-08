@@ -27,7 +27,7 @@ class Config:
         '资产评估': 'AAP',
         '土地评估': 'LAP',
         '珠宝评估': 'JAP',
-        '矿业权评估': 'MRA',
+        '矿业权评估': 'MRV',
         '咨询': 'ACP'
     }
 
@@ -35,7 +35,7 @@ class Config:
     DEPARTMENTS = [
         '业务1组（房地产）',
         '业务2组（固定资产）',
-        '业务3组（企业价值、无形资产）',
+        '业务3组（企业价值）',
         '质控部'
     ]
 
@@ -786,7 +786,7 @@ USE \
                type_code VARCHAR \
            ( \
                3 \
-           ) COMMENT '类型代码：AAP、LAP、JAP、MRA、ACP',
+           ) COMMENT '类型代码：AAP、LAP、JAP、MRV、ACP',
                manager VARCHAR \
            ( \
                100 \
@@ -794,7 +794,7 @@ USE \
                department VARCHAR \
            ( \
                100 \
-           ) COMMENT '业务1组（房地产）、业务2组（固定资产）、业务3组（企业价值、无形资产）、质控部',
+           ) COMMENT '业务1组（房地产）、业务2组（固定资产）、业务3组（企业价值）、质控部',
                estimated_fee DECIMAL \
            ( \
                18, \
