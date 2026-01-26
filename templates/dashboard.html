@@ -275,7 +275,7 @@
             width: 100%;
             border-collapse: collapse;
             font-size: 14px;
-            min-width: 1200px;
+            min-width: 2500px; /* 增加宽度以支持横向滚动 */
         }
 
         .data-table th {
@@ -286,13 +286,19 @@
             color: var(--dark);
             border-bottom: 2px solid var(--border);
             white-space: nowrap; /* 表头不换行 */
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
 
         .data-table td {
             padding: 14px 16px;
             border-bottom: 1px solid var(--border);
             vertical-align: middle;
-            word-break: break-word; /* 默认允许换行 */
+            white-space: nowrap; /* 内容不换行 */
+            max-width: 400px;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .data-table tr:last-child td {
@@ -625,6 +631,7 @@
                             <option value="业务1组（房地产）">业务1组（房地产）</option>
                             <option value="业务2组（固定资产）">业务2组（固定资产）</option>
                             <option value="业务3组（企业价值）">业务3组（企业价值）</option>
+                            <option value="矿业权小组">矿业权小组</option>
                             <option value="质控部">质控部</option>
                         </select>
                     </div>
@@ -649,7 +656,29 @@
                     </div>
                 </div>
 
+                <!-- 新增：关联合同号和备注 -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>关联合同号</label>
+                        <input type="text" name="related_contract_no" placeholder="请输入关联合同号">
+                    </div>
+                    <div class="form-group">
+                        <label>备注</label>
+                        <input type="text" name="remark" placeholder="请输入备注">
+                    </div>
+                </div>
+
                 <!-- 第四行：委托方名称 -->
+                <div class="form-group">
+                    <label>关联合同号</label>
+                    <input type="text" id="editRelatedContractNo" name="related_contract_no">
+                </div>
+
+                <div class="form-group">
+                    <label>备注</label>
+                    <textarea id="editRemark" name="remark" rows="2"></textarea>
+                </div>
+
                 <div class="form-group">
                     <label class="required">委托方名称</label>
                     <input type="text" name="client" required
@@ -743,6 +772,7 @@
                         <option value="业务1组（房地产）">业务1组（房地产）</option>
                         <option value="业务2组（固定资产）">业务2组（固定资产）</option>
                         <option value="业务3组（企业价值）">业务3组（企业价值）</option>
+                            <option value="矿业权小组">矿业权小组</option>
                         <option value="质控部">质控部</option>
                     </select>
                 </div>
@@ -762,15 +792,19 @@
                         <tr>
                             <th>项目号</th>
                             <th>项目名称</th>
+                            <th>委托方</th>
                             <th>评估类型</th>
                             <th>负责人</th>
+                            <th>关联合同号</th>
                             <th>部门</th>
                             <th>预计收费</th>
-                            <th>委托方</th>
+                            <!-- <th>关联合同号</th> -->
+                            <!-- <th>委托方</th> -->
                             <th class="no-wrap">立项日期</th>
                             <th class="no-wrap">评估基准日</th>
                             <th class="no-wrap">创建时间</th>
-                            <th>操作</th>
+                            <th>备注</th>
+                            <th style="position: sticky; right: 0; background: #f8f9fa; z-index: 20; box-shadow: -2px 0 5px rgba(0,0,0,0.05);">操作</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -780,8 +814,10 @@
                                 <span class="project-no">{{ project.project_no }}</span>
                             </td>
                             <td>{{ project.project_name }}</td>
+                            <td>{{ project.client or '-' }}</td>
                             <td>{{ project.project_type }}</td>
                             <td>{{ project.manager }}</td>
+                            <td>{{ project.related_contract_no or '-' }}</td>
                             <td>{{ project.department or '-' }}</td>
                             <td>
                                 {% if project.estimated_fee and project.estimated_fee > 0 %}
@@ -790,11 +826,13 @@
                                     -
                                 {% endif %}
                             </td>
-                            <td>{{ project.client or '-' }}</td>
+                            <!-- <td>{{ project.related_contract_no or '-' }}</td> -->
+                            <!-- <td>{{ project.client or '-' }}</td> -->
                             <td class="no-wrap">{{ project.project_date or '-' }}</td>
                             <td class="no-wrap">{{ project.base_date or '-' }}</td>
                             <td class="no-wrap">{{ project.created_date }}</td>
-                            <td>
+                            <td title="{{ project.remark or '' }}">{{ project.remark or '-' }}</td>
+                            <td style="position: sticky; right: 0; background: white; z-index: 15; box-shadow: -2px 0 5px rgba(0,0,0,0.05);">
                                 <div class="action-buttons">
                                     <button class="btn btn-warning btn-sm" onclick="editProject({{ project.id }})">
                                         <span>✏️</span>
@@ -855,6 +893,7 @@
                         <option value="业务1组（房地产）">业务1组（房地产）</option>
                         <option value="业务2组（固定资产）">业务2组（固定资产）</option>
                         <option value="业务3组（企业价值）">业务3组（企业价值）</option>
+                            <option value="矿业权小组">矿业权小组</option>
                         <option value="质控部">质控部</option>
                     </select>
                 </div>
@@ -892,6 +931,7 @@
                         <option value="业务1组（房地产）">业务1组（房地产）</option>
                         <option value="业务2组（固定资产）">业务2组（固定资产）</option>
                         <option value="业务3组（企业价值）">业务3组（企业价值）</option>
+                            <option value="矿业权小组">矿业权小组</option>
                         <option value="质控部">质控部</option>
                     </select>
                 </div>
@@ -909,6 +949,16 @@
                 <div class="form-group">
                     <label>评估基准日</label>
                     <input type="date" id="editBaseDate" name="base_date">
+                </div>
+
+                <div class="form-group">
+                    <label>关联合同号</label>
+                    <input type="text" id="editRelatedContractNo" name="related_contract_no">
+                </div>
+
+                <div class="form-group">
+                    <label>备注</label>
+                    <textarea id="editRemark" name="remark" rows="2"></textarea>
                 </div>
 
                 <div class="form-group">
@@ -1009,6 +1059,8 @@
                         document.getElementById('editEstimatedFee').value = project.estimated_fee || '';
                         document.getElementById('editProjectDate').value = project.project_date || '';
                         document.getElementById('editBaseDate').value = project.base_date || '';
+                        document.getElementById('editRelatedContractNo').value = project.related_contract_no || '';
+                        document.getElementById('editRemark').value = project.remark || '';
                         document.getElementById('editClient').value = project.client || '';
                         document.getElementById('editEvaluationObject').value = project.evaluation_object || '';
                         document.getElementById('editEvaluationScope').value = project.evaluation_scope || '';

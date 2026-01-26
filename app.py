@@ -36,6 +36,7 @@ class Config:
         '业务1组（房地产）',
         '业务2组（固定资产）',
         '业务3组（企业价值）',
+        '矿业权小组',
         '质控部'
     ]
 
@@ -361,6 +362,8 @@ def dashboard():
                                       evaluation_object,
                                       project_date,
                                       base_date,
+                                      related_contract_no,
+                                      remark,
                                       DATE_FORMAT(created_date, '%Y/%m/%d %H:%i') as created_date
                                FROM projects
                                ORDER BY created_date DESC
@@ -451,6 +454,8 @@ def create_project():
         # 处理日期字段
         project_date = request.form.get('project_date') or None
         base_date = request.form.get('base_date') or None
+        related_contract_no = request.form.get('related_contract_no', '').strip()
+        remark = request.form.get('remark', '').strip()
 
         # 插入数据库
         conn = get_db_connection()
@@ -465,9 +470,9 @@ def create_project():
                                INSERT INTO projects
                                (project_no, project_name, project_type, type_code,
                                 manager, department, estimated_fee, project_date, base_date,
-                                client, evaluation_object, evaluation_scope, purpose,
+                                client, evaluation_object, evaluation_scope, purpose, related_contract_no, remark,
                                 created_by)
-                               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                                """, (
                                    project_no,
                                    project_name,
@@ -482,6 +487,8 @@ def create_project():
                                    request.form.get('evaluation_object', '').strip(),
                                    request.form.get('evaluation_scope', '').strip(),
                                    request.form.get('purpose', '').strip(),
+                                   related_contract_no,
+                                   remark,
                                    session['username']
                                ))
 
@@ -535,6 +542,8 @@ def edit_project(project_id):
                                evaluation_object = %s,
                                evaluation_scope  = %s,
                                purpose           = %s,
+                               related_contract_no = %s,
+                               remark            = %s,
                                updated_date      = NOW()
                            WHERE id = %s
                            """, (
@@ -548,6 +557,8 @@ def edit_project(project_id):
                                request.form.get('evaluation_object', '').strip(),
                                request.form.get('evaluation_scope', '').strip(),
                                request.form.get('purpose', '').strip(),
+                               request.form.get('related_contract_no', '').strip(),
+                               request.form.get('remark', '').strip(),
                                project_id
                            ))
 
@@ -649,7 +660,9 @@ def api_get_project(project_id):
                                   client,
                                   evaluation_object,
                                   evaluation_scope,
-                                  purpose
+                                  purpose,
+                                  related_contract_no,
+                                  remark
                            FROM projects
                            WHERE id = %s
                            """, (project_id,))
@@ -809,6 +822,8 @@ USE \
                evaluation_object TEXT NOT NULL COMMENT '评估对象',
                evaluation_scope TEXT NOT NULL COMMENT '评估范围',
                purpose TEXT NOT NULL COMMENT '经济行为目的',
+               related_contract_no VARCHAR(100) COMMENT '关联合同号',
+               remark TEXT COMMENT '备注',
                created_by VARCHAR \
            ( \
                50 \
