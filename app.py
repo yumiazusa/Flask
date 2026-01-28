@@ -353,12 +353,13 @@ def dashboard():
     if conn:
         try:
             with conn.cursor() as cursor:
-                # 获取项目列表（简化字段，不包含状态）
+                # 获取项目列表（包含状态字段）
                 cursor.execute("""
                                SELECT id,
                                       project_no,
                                       project_name,
                                       project_type,
+                                      status,
                                       manager,
                                       business_execution_partner,
                                       department,
@@ -428,6 +429,10 @@ def create_project():
             flash('请输入项目负责人', 'error')
             return redirect(url_for('dashboard'))
 
+        if not business_execution_partner:
+            flash('请输入业务执行合伙人', 'error')
+            return redirect(url_for('dashboard'))
+
         # 验证新增的必填字段
         required_fields = {
             'client': '委托方名称',
@@ -474,16 +479,17 @@ def create_project():
                 # 插入新项目
                 cursor.execute("""
                                INSERT INTO projects
-                               (project_no, project_name, project_type, type_code,
+                               (project_no, project_name, project_type, type_code, status,
                                 manager, business_execution_partner, department, estimated_fee, project_date, base_date,
                                 client, evaluation_object, evaluation_scope, purpose, related_contract_no, remark,
                                 created_by)
-                               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                                """, (
                                    project_no,
                                    project_name,
                                    project_type,
                                    type_code,
+                                   'active',
                                    manager,
                                    business_execution_partner,
                                    request.form.get('department', '').strip(),
@@ -525,17 +531,31 @@ def create_project():
 # ---------- 编辑项目 ----------
 @app.route('/project/<int:project_id>/edit', methods=['POST'])
 def edit_project(project_id):
-    """编辑项目信息"""
+    """编辑项目信息 (AJAX)"""
     if 'user_id' not in session:
-        return redirect(url_for('login'))
+        return jsonify({'success': False, 'error': '未登录'}), 401
+
+    # 获取并验证必填字段
+    project_name = request.form.get('project_name', '').strip()
+    manager = request.form.get('manager', '').strip()
+    business_execution_partner = request.form.get('business_execution_partner', '').strip()
+    client = request.form.get('client', '').strip()
+
+    if not project_name or not manager or not business_execution_partner or not client:
+        return jsonify({'success': False, 'error': '请填写所有必填字段'}), 400
 
     conn = get_db_connection()
     if not conn:
-        flash('数据库连接失败', 'error')
-        return redirect(url_for('dashboard'))
+        return jsonify({'success': False, 'error': '数据库连接失败'}), 500
 
     try:
         with conn.cursor() as cursor:
+            # 检查项目状态，如果已作废则不允许编辑
+            cursor.execute("SELECT status FROM projects WHERE id = %s", (project_id,))
+            project = cursor.fetchone()
+            if project and project['status'] == 'invalid':
+                return jsonify({'success': False, 'error': '该项目已作废，不可编辑'}), 403
+
             # 更新项目信息
             cursor.execute("""
                            UPDATE projects
@@ -555,14 +575,14 @@ def edit_project(project_id):
                                updated_date      = NOW()
                            WHERE id = %s
                            """, (
-                               request.form.get('project_name', '').strip(),
-                               request.form.get('manager', '').strip(),
-                               request.form.get('business_execution_partner', '').strip(),
+                               project_name,
+                               manager,
+                               business_execution_partner,
                                request.form.get('department', '').strip(),
                                float(request.form.get('estimated_fee', '0') or 0),
                                request.form.get('project_date') or None,
                                request.form.get('base_date') or None,
-                               request.form.get('client', '').strip(),
+                               client,
                                request.form.get('evaluation_object', '').strip(),
                                request.form.get('evaluation_scope', '').strip(),
                                request.form.get('purpose', '').strip(),
@@ -572,22 +592,30 @@ def edit_project(project_id):
                            ))
 
             conn.commit()
-            flash('项目更新成功！', 'success')
+            
+            # 返回更新后的数据用于前端刷新UI
+            cursor.execute("""
+                           SELECT id, project_no, project_name, project_type, status, manager, 
+                                  business_execution_partner, department, estimated_fee, client,
+                                  related_contract_no, remark, project_date, base_date,
+                                  DATE_FORMAT(created_date, '%Y/%m/%d %H:%i') as created_date
+                           FROM projects WHERE id = %s
+                           """, (project_id,))
+            updated_project = cursor.fetchone()
+            
+            return jsonify({'success': True, 'message': '项目更新成功！', 'project': updated_project})
 
     except Exception as e:
-        flash(f'更新失败：{str(e)}', 'error')
         conn.rollback()
-        print(f"[编辑项目] 错误: {e}")
+        return jsonify({'success': False, 'error': f'更新失败：{str(e)}'}), 500
     finally:
         conn.close()
-
-    return redirect(url_for('dashboard'))
 
 
 # ---------- 删除项目 ----------
 @app.route('/project/<int:project_id>/delete')
 def delete_project(project_id):
-    """删除项目"""
+    """删除项目 (同步路由，保留用于兼容，但前端现在使用 AJAX)"""
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
@@ -598,28 +626,128 @@ def delete_project(project_id):
 
     try:
         with conn.cursor() as cursor:
-            # 先获取项目号用于提示
-            cursor.execute("SELECT project_no FROM projects WHERE id = %s", (project_id,))
-            result = cursor.fetchone()
-            project_no = result['project_no'] if result else None
+            # 执行删除前的末位校验
+            cursor.execute("SELECT project_no, project_type FROM projects WHERE id = %s", (project_id,))
+            project = cursor.fetchone()
+            if not project:
+                flash('项目不存在', 'error')
+                return redirect(url_for('dashboard'))
+
+            # 查找同类型下是否有更新的项目号
+            cursor.execute("""
+                SELECT COUNT(*) as count FROM projects 
+                WHERE project_type = %s AND project_no > %s
+            """, (project['project_type'], project['project_no']))
+            
+            if cursor.fetchone()['count'] > 0:
+                flash('该项目编号后续已有项目创建，不可删除。如需停用，请使用“作废”功能。', 'error')
+                return redirect(url_for('dashboard'))
 
             # 删除项目
             cursor.execute("DELETE FROM projects WHERE id = %s", (project_id,))
             conn.commit()
-
-            if project_no:
-                flash(f'项目 {project_no} 已删除', 'info')
-            else:
-                flash('项目已删除', 'info')
+            flash(f'项目 {project["project_no"]} 已删除', 'info')
 
     except Exception as e:
         flash(f'删除失败：{str(e)}', 'error')
         conn.rollback()
-        print(f"[删除项目] 错误: {e}")
     finally:
         conn.close()
 
     return redirect(url_for('dashboard'))
+
+
+@app.route('/api/project/<int:project_id>/invalidate', methods=['POST'])
+def api_invalidate_project(project_id):
+    """API: 作废项目"""
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': '未登录'}), 401
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'error': '数据库连接失败'}), 500
+
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("UPDATE projects SET status = 'invalid' WHERE id = %s", (project_id,))
+            conn.commit()
+            return jsonify({'success': True, 'message': '项目已作废'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/project/<int:project_id>/check_delete')
+def api_check_delete(project_id):
+    """API: 检查是否可以删除（是否为末位编号）"""
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': '未登录'}), 401
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'error': '数据库连接失败'}), 500
+
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT project_no, project_type FROM projects WHERE id = %s", (project_id,))
+            project = cursor.fetchone()
+            if not project:
+                return jsonify({'success': False, 'error': '项目不存在'})
+
+            # 查找同类型下是否有更新的项目号
+            cursor.execute("""
+                SELECT COUNT(*) as count FROM projects 
+                WHERE project_type = %s AND project_no > %s
+            """, (project['project_type'], project['project_no']))
+            
+            can_delete = cursor.fetchone()['count'] == 0
+            return jsonify({
+                'success': True, 
+                'can_delete': can_delete,
+                'project_no': project['project_no']
+            })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/project/<int:project_id>/delete', methods=['POST'])
+def api_delete_project(project_id):
+    """API: 删除项目 (AJAX)"""
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': '未登录'}), 401
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'error': '数据库连接失败'}), 500
+
+    try:
+        with conn.cursor() as cursor:
+            # 再次校验
+            cursor.execute("SELECT project_no, project_type FROM projects WHERE id = %s", (project_id,))
+            project = cursor.fetchone()
+            if not project:
+                return jsonify({'success': False, 'error': '项目不存在'})
+
+            cursor.execute("""
+                SELECT COUNT(*) as count FROM projects 
+                WHERE project_type = %s AND project_no > %s
+            """, (project['project_type'], project['project_no']))
+            
+            if cursor.fetchone()['count'] > 0:
+                return jsonify({'success': False, 'error': '该项目编号后续已有项目创建，不可删除。'})
+
+            cursor.execute("DELETE FROM projects WHERE id = %s", (project_id,))
+            conn.commit()
+            return jsonify({'success': True, 'message': f'项目 {project["project_no"]} 已删除'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
 
 
 # ---------- 导出Excel ----------
@@ -637,7 +765,8 @@ def export_projects():
     try:
         with conn.cursor() as cursor:
             cursor.execute("""
-                           SELECT project_no as '项目号',
+                           SELECT 
+                                  project_no as '项目号',
                                   project_name as '项目名称',
                                   client as '委托方',
                                   project_type as '评估类型',
@@ -665,6 +794,9 @@ def export_projects():
 
         # 转换为DataFrame
         df = pd.DataFrame(projects)
+        
+        # 增加自然序号列 (倒序序号：最新条目序号最大)
+        df.insert(0, '序号', range(len(df), 0, -1))
 
         # 创建内存中的字节流
         output = io.BytesIO()
@@ -692,9 +824,9 @@ def export_projects():
 
         output.seek(0)
         
-        # 文件命名：合同列表_导出_YYYYMMDD_HHMMSS.xlsx
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"合同列表_导出_{timestamp}.xlsx"
+        # 文件命名：项目列表_导出_YYYYMMDD.xlsx
+        timestamp = datetime.now().strftime('%Y%m%d')
+        filename = f"项目列表_导出_{timestamp}.xlsx"
 
         return send_file(
             output,
@@ -895,6 +1027,7 @@ USE \
            ( \
                50 \
            ) COMMENT '评估类型：资产评估、土地评估、珠宝评估、矿业权评估、咨询',
+               status VARCHAR(20) DEFAULT 'active' COMMENT '项目状态：active-有效, invalid-作废',
                type_code VARCHAR \
            ( \
                3 \

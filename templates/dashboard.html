@@ -265,10 +265,41 @@
 
         /* 表格样式 */
         .table-container {
-            overflow-x: auto;
+            overflow: auto;
+            max-height: 65vh; /* 进一步限制高度，确保横向滚动条在大多数屏幕上始终可见 */
             margin-top: 15px;
             border-radius: 6px;
             border: 1px solid var(--border);
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            position: relative;
+        }
+
+        /* 自定义滚动条样式，使其更宽更易于操作 */
+        .table-container::-webkit-scrollbar {
+            width: 12px;
+            height: 12px;
+        }
+
+        .table-container::-webkit-scrollbar-track {
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+
+        .table-container::-webkit-scrollbar-thumb {
+            background: #cbd5e0;
+            border-radius: 6px;
+            border: 3px solid #f8f9fa;
+        }
+
+        .table-container::-webkit-scrollbar-thumb:hover {
+            background: var(--secondary);
+        }
+
+        /* 确保固定列在滚动时有阴影效果 */
+        .data-table th:last-child,
+        .data-table td:last-child {
+            box-shadow: -4px 0 8px rgba(0,0,0,0.05) !important;
         }
 
         .data-table {
@@ -307,6 +338,54 @@
 
         .data-table tr:hover {
             background-color: #f8f9fa;
+        }
+
+        /* 项目状态样式 */
+        .status-tag {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .status-active {
+            color: var(--success);
+            border: 1px solid var(--success);
+            background-color: rgba(39, 174, 96, 0.1);
+        }
+
+        .status-invalid {
+            color: var(--danger);
+            border: 1px solid var(--danger);
+            background-color: rgba(231, 76, 60, 0.1);
+        }
+
+        /* 已作废行样式 */
+        .row-invalid {
+            background-color: #f5f5f5 !important;
+            color: #999;
+        }
+
+        .row-invalid td {
+            border-color: #eee !important;
+        }
+
+        .row-invalid .project-no,
+        .row-invalid .amount {
+            color: #999 !important;
+        }
+
+        /* 警告信息样式 */
+        .warning-text {
+            color: var(--danger);
+            background: #fff5f5;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid var(--danger);
+            margin-bottom: 20px;
+            font-size: 14px;
+            line-height: 1.6;
         }
 
         /* 特殊列样式：日期列不换行 */
@@ -457,26 +536,151 @@
             gap: 15px;
             margin-bottom: 20px;
             flex-wrap: wrap;
+            align-items: flex-end;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
         }
 
         .filter-group {
             display: flex;
-            align-items: center;
-            gap: 10px;
+            flex-direction: column;
+            gap: 5px;
         }
 
         .filter-group label {
-            font-weight: 500;
-            color: #34495e;
-            font-size: 14px;
+            font-weight: 600;
+            color: #4b6584;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
-        .filter-select {
+        .filter-select,
+        .filter-input {
             padding: 8px 12px;
             border: 2px solid var(--border);
             border-radius: 6px;
             font-size: 14px;
             min-width: 150px;
+            transition: all 0.3s ease;
+        }
+
+        .filter-input:focus {
+            outline: none;
+            border-color: var(--secondary);
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        /* 自定义多选下拉框样式 */
+        .custom-dropdown {
+            position: relative;
+            min-width: 180px;
+            user-select: none;
+        }
+
+        .dropdown-toggle {
+            padding: 8px 12px;
+            border: 2px solid var(--border);
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .dropdown-toggle:hover {
+            border-color: var(--secondary);
+        }
+
+        .dropdown-toggle .arrow {
+            font-size: 10px;
+            transition: transform 0.3s ease;
+        }
+
+        .custom-dropdown.active .dropdown-toggle {
+            border-color: var(--secondary);
+            border-bottom-left-radius: 0;
+            border-bottom-right-radius: 0;
+        }
+
+        .custom-dropdown.active .arrow {
+            transform: rotate(180deg);
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 2px solid var(--secondary);
+            border-top: none;
+            border-bottom-left-radius: 6px;
+            border-bottom-right-radius: 6px;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .custom-dropdown.active .dropdown-menu {
+            display: block;
+        }
+
+        .dropdown-search {
+            padding: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .dropdown-search input {
+            width: 100%;
+            padding: 6px 10px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .dropdown-options {
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 5px 0;
+        }
+
+        .dropdown-option {
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .dropdown-option:hover {
+            background-color: #f8f9fa;
+        }
+
+        .dropdown-option input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .dropdown-option label {
+            cursor: pointer;
+            font-size: 13px;
+            flex: 1;
+            margin: 0;
+        }
+
+        .selected-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 140px;
         }
 
         /* 响应式调整 */
@@ -625,8 +829,8 @@
                     </div>
 
                     <div class="form-group">
-                        <label>业务执行合伙人</label>
-                        <input type="text" name="business_execution_partner"
+                        <label class="required">业务执行合伙人</label>
+                        <input type="text" name="business_execution_partner" required
                                placeholder="请输入业务执行合伙人姓名">
                     </div>
 
@@ -743,7 +947,7 @@
         <div class="card">
             <div class="card-title">
                 <span class="icon">📋</span>
-                <span>项目合同列表</span>
+                <span>项目列表</span>
                 <span style="margin-left: auto; font-size: 14px; color: var(--gray);">
                     共 {{ projects|length }} 个记录
                 </span>
@@ -752,36 +956,110 @@
             <!-- 筛选器 -->
             <div class="filter-container">
                 <div class="filter-group">
-                    <label>按类型筛选：</label>
-                    <select class="filter-select" onchange="filterByType(this.value)">
-                        <option value="">全部类型</option>
-                        {% for type_name, code in evaluation_types.items() %}
-                        <option value="{{ type_name }}">{{ type_name }}</option>
-                        {% endfor %}
-                    </select>
+                    <label>评估类型：</label>
+                    <div class="custom-dropdown" id="dropdownType">
+                        <div class="dropdown-toggle">
+                            <span class="selected-text">全部类型</span>
+                            <span class="arrow">▼</span>
+                        </div>
+                        <div class="dropdown-menu">
+                            <div class="dropdown-search">
+                                <input type="text" placeholder="搜索类型...">
+                            </div>
+                            <div class="dropdown-options">
+                                {% for type_name, code in evaluation_types.items() %}
+                                <div class="dropdown-option">
+                                    <input type="checkbox" value="{{ type_name }}" id="type_{{ loop.index }}">
+                                    <label for="type_{{ loop.index }}">{{ type_name }}</label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="filter-group">
-                    <label>按部门筛选：</label>
-                    <select class="filter-select" onchange="filterByDepartment(this.value)">
-                        <option value="">全部部门</option>
-                        <option value="业务1组（房地产）">业务1组（房地产）</option>
-                        <option value="业务2组（固定资产）">业务2组（固定资产）</option>
-                        <option value="业务3组（企业价值）">业务3组（企业价值）</option>
-                        <option value="矿业权小组">矿业权小组</option>
-                        <option value="质控部">质控部</option>
-                        <option value="其他">其他</option>
-                    </select>
+                    <label>所属部门：</label>
+                    <div class="custom-dropdown" id="dropdownDept">
+                        <div class="dropdown-toggle">
+                            <span class="selected-text">全部部门</span>
+                            <span class="arrow">▼</span>
+                        </div>
+                        <div class="dropdown-menu">
+                            <div class="dropdown-search">
+                                <input type="text" placeholder="搜索部门...">
+                            </div>
+                            <div class="dropdown-options">
+                                <div class="dropdown-option">
+                                    <input type="checkbox" value="业务1组（房地产）" id="dept_1">
+                                    <label for="dept_1">业务1组（房地产）</label>
+                                </div>
+                                <div class="dropdown-option">
+                                    <input type="checkbox" value="业务2组（固定资产）" id="dept_2">
+                                    <label for="dept_2">业务2组（固定资产）</label>
+                                </div>
+                                <div class="dropdown-option">
+                                    <input type="checkbox" value="业务3组（企业价值）" id="dept_3">
+                                    <label for="dept_3">业务3组（企业价值）</label>
+                                </div>
+                                <div class="dropdown-option">
+                                    <input type="checkbox" value="矿业权小组" id="dept_4">
+                                    <label for="dept_4">矿业权小组</label>
+                                </div>
+                                <div class="dropdown-option">
+                                    <input type="checkbox" value="质控部" id="dept_5">
+                                    <label for="dept_5">质控部</label>
+                                </div>
+                                <div class="dropdown-option">
+                                    <input type="checkbox" value="其他" id="dept_6">
+                                    <label for="dept_6">其他</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div style="margin-left: auto; display: flex; gap: 10px;">
-                    <button class="btn btn-success" onclick="location.href='/export/projects'" style="padding: 8px 16px;">
+                <div class="filter-group">
+                    <label>项目负责人：</label>
+                    <div class="custom-dropdown" id="dropdownManager">
+                        <div class="dropdown-toggle">
+                            <span class="selected-text">所有</span>
+                            <span class="arrow">▼</span>
+                        </div>
+                        <div class="dropdown-menu">
+                            <div class="dropdown-search">
+                                <input type="text" placeholder="搜索负责人...">
+                            </div>
+                            <div class="dropdown-options" id="managerOptions">
+                                <!-- 由JS动态生成 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <label>项目号：</label>
+                    <input type="text" class="filter-input" id="filterProjectNo" placeholder="输入项目号搜索..." oninput="applyFilters()">
+                </div>
+
+                <div class="filter-group">
+                    <label>合同号：</label>
+                    <input type="text" class="filter-input" id="filterContractNo" placeholder="输入合同号搜索..." oninput="applyFilters()">
+                </div>
+
+                <div class="filter-group">
+                    <label>委托方：</label>
+                    <input type="text" class="filter-input" id="filterClient" placeholder="输入委托方搜索..." oninput="applyFilters()">
+                </div>
+
+                <div style="margin-left: auto; display: flex; gap: 10px; align-items: flex-end;">
+                    <button class="btn btn-success" onclick="handleExport()" style="padding: 8px 16px;">
                         <span>📊</span>
                         <span>导出Excel</span>
                     </button>
                     <button class="btn" onclick="resetFilters()" style="padding: 8px 16px;">
                         <span>🔄</span>
-                        <span>重置筛选</span>
+                        <span>重置</span>
                     </button>
                 </div>
             </div>
@@ -791,13 +1069,15 @@
                 <table class="data-table" id="projectTable">
                     <thead>
                         <tr>
+                            <th style="min-width: 50px;">序号</th>
                             <th>项目号</th>
                             <th>项目名称</th>
                             <th>委托方名称</th>
+                            <th>关联合同号</th>
                             <th>评估类型</th>
+                            <th>状态</th>
                             <th>项目负责人</th>
                             <th>业务执行合伙人</th>
-                            <th>关联合同号</th>
                             <th>所属部门</th>
                             <th>预计收费金额（元）</th>
                             <th class="no-wrap">立项日期</th>
@@ -809,16 +1089,32 @@
                     </thead>
                     <tbody>
                         {% for project in projects %}
-                        <tr data-type="{{ project.project_type }}" data-department="{{ project.department or '' }}">
+                        <tr data-id="{{ project.id }}"
+                            data-type="{{ project.project_type }}" 
+                            data-department="{{ project.department or '' }}"
+                            data-project-no="{{ project.project_no }}"
+                            data-client="{{ project.client or '' }}"
+                            data-contract-no="{{ project.related_contract_no or '' }}"
+                            data-manager="{{ project.manager or '' }}"
+                            data-status="{{ project.status or 'active' }}"
+                            class="{{ 'row-invalid' if project.status == 'invalid' else '' }}">
+                            <td class="seq-num">{{ projects|length - loop.index + 1 }}</td>
                             <td>
                                 <span class="project-no">{{ project.project_no }}</span>
                             </td>
                             <td>{{ project.project_name }}</td>
                             <td>{{ project.client or '-' }}</td>
+                            <td>{{ project.related_contract_no or '-' }}</td>
                             <td>{{ project.project_type }}</td>
+                            <td>
+                                {% if project.status == 'invalid' %}
+                                <span class="status-tag status-invalid">已作废</span>
+                                {% else %}
+                                <span class="status-tag status-active">有效</span>
+                                {% endif %}
+                            </td>
                             <td>{{ project.manager }}</td>
                             <td>{{ project.business_execution_partner or '-' }}</td>
-                            <td>{{ project.related_contract_no or '-' }}</td>
                             <td>{{ project.department or '-' }}</td>
                             <td>
                                 {% if project.estimated_fee and project.estimated_fee > 0 %}
@@ -833,14 +1129,22 @@
                             <td title="{{ project.remark or '' }}">{{ project.remark or '-' }}</td>
                             <td style="position: sticky; right: 0; background: white; z-index: 15; box-shadow: -2px 0 5px rgba(0,0,0,0.05);">
                                 <div class="action-buttons">
+                                    {% if project.status != 'invalid' %}
                                     <button class="btn btn-warning btn-sm" onclick="editProject({{ project.id }})">
                                         <span>✏️</span>
                                         <span>编辑</span>
                                     </button>
-                                    <button class="btn btn-danger btn-sm" onclick="confirmDelete({{ project.id }}, '{{ project.project_no }}')">
+                                    <button class="btn btn-danger btn-sm" onclick="handleDelete({{ project.id }}, '{{ project.project_no }}')">
                                         <span>🗑️</span>
                                         <span>删除</span>
                                     </button>
+                                    <button class="btn btn-sm" onclick="confirmInvalidate({{ project.id }}, '{{ project.project_no }}')" style="background: #95a5a6; color: white;">
+                                        <span>🚫</span>
+                                        <span>作废</span>
+                                    </button>
+                                    {% else %}
+                                    <span style="color: #999; font-size: 12px;">不可操作</span>
+                                    {% endif %}
                                 </div>
                             </td>
                         </tr>
@@ -911,9 +1215,9 @@
     <div id="editModal" class="modal">
         <div class="modal-content">
             <h3>编辑项目</h3>
-            <form method="POST" id="editForm">
+            <form id="editForm">
                 <input type="hidden" id="editProjectId" name="project_id">
-
+                <!-- ... 表单内容保持不变 ... -->
                 <div class="form-group">
                     <label class="required">项目名称</label>
                     <input type="text" id="editProjectName" name="project_name" required>
@@ -925,8 +1229,8 @@
                 </div>
 
                 <div class="form-group">
-                    <label>业务执行合伙人</label>
-                    <input type="text" id="editBusinessExecutionPartner" name="business_execution_partner">
+                    <label class="required">业务执行合伙人</label>
+                    <input type="text" id="editBusinessExecutionPartner" name="business_execution_partner" required>
                 </div>
 
                 <div class="form-group">
@@ -998,6 +1302,33 @@
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- 作废确认模态框 -->
+    <div id="invalidateModal" class="modal">
+        <div class="modal-content">
+            <h3>确认作废</h3>
+            <div class="warning-text">
+                一旦选择作废，则该项目编号将被标记为作废状态，且项目内容不可再编辑。此操作是为了保持编号序列的连续性，已提交的编号将永久占用。
+            </div>
+            <p id="invalidateProjectInfo" style="margin-bottom: 20px; font-weight: bold;"></p>
+            <div style="text-align: right;">
+                <button class="btn" onclick="closeInvalidateModal()" style="margin-right: 10px;">取消</button>
+                <button id="confirmInvalidateBtn" class="btn btn-danger">确认作废</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 删除提示/确认模态框 -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content">
+            <h3 id="deleteModalTitle">删除项目</h3>
+            <div id="deleteModalBody" style="margin-bottom: 20px;"></div>
+            <div style="text-align: right;">
+                <button id="deleteCancelBtn" class="btn" onclick="closeDeleteModal()" style="margin-right: 10px;">取消</button>
+                <button id="deleteConfirmBtn" class="btn btn-danger">确认删除</button>
+            </div>
         </div>
     </div>
 
@@ -1073,10 +1404,6 @@
                         document.getElementById('editEvaluationScope').value = project.evaluation_scope || '';
                         document.getElementById('editPurpose').value = project.purpose || '';
 
-                        // 设置表单提交地址
-                        const form = document.getElementById('editForm');
-                        form.action = `/project/${projectId}/edit`;
-
                         // 显示模态框
                         document.getElementById('editModal').style.display = 'flex';
                     } else {
@@ -1089,11 +1416,186 @@
                 });
         }
 
-        // 确认删除项目
-        function confirmDelete(projectId, projectNo) {
-            if (confirm(`确定要删除项目 ${projectNo} 吗？\n此操作不可恢复！`)) {
-                window.location.href = `/project/${projectId}/delete`;
+        // 处理导出逻辑
+        function handleExport() {
+            const today = new Date().toISOString().split('T')[0]; // 获取 YYYY-MM-DD
+            const lastExportDate = localStorage.getItem('lastExportDate');
+            
+            if (lastExportDate === today) {
+                if (confirm('系统检测到您今天已经导出过项目列表。再次导出将下载同名文件，是否继续？')) {
+                    executeExport();
+                }
+            } else {
+                executeExport();
             }
+        }
+
+        function executeExport() {
+            const today = new Date().toISOString().split('T')[0];
+            localStorage.setItem('lastExportDate', today);
+            window.location.href = '/export/projects';
+        }
+
+        // 处理编辑表单提交 (AJAX)
+        document.getElementById('editForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const projectId = document.getElementById('editProjectId').value;
+            const formData = new FormData(this);
+
+            fetch(`/project/${projectId}/edit`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // 更新表格行
+                    updateTableRow(data.project);
+                    closeModal();
+                    // 可选：显示成功提示
+                    alert(data.message);
+                } else {
+                    alert('更新失败: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('网络错误，请重试');
+            });
+        });
+
+        // 更新表格行内容
+        function updateTableRow(project) {
+            const row = document.querySelector(`tr[data-id="${project.id}"]`);
+            if (!row) return;
+
+            // 更新 data 属性
+            row.setAttribute('data-project-no', project.project_no);
+            row.setAttribute('data-client', project.client || '');
+            row.setAttribute('data-manager', project.manager || '');
+            row.setAttribute('data-department', project.department || '');
+            row.setAttribute('data-contract-no', project.related_contract_no || '');
+            row.setAttribute('data-status', project.status);
+
+            // 更新单元格内容
+            const cells = row.cells;
+            cells[1].querySelector('.project-no').textContent = project.project_no;
+            cells[2].textContent = project.project_name;
+            cells[3].textContent = project.client || '-';
+            cells[4].textContent = project.related_contract_no || '-';
+            cells[5].textContent = project.project_type;
+            
+            // 状态列 (Index 6)
+            const statusCell = cells[6];
+            if (project.status === 'invalid') {
+                statusCell.innerHTML = '<span class="status-tag status-invalid">已作废</span>';
+                row.classList.add('row-invalid');
+                // 更新操作列为不可操作
+                row.cells[row.cells.length-1].innerHTML = '<span style="color: #999; font-size: 12px;">不可操作</span>';
+            } else {
+                statusCell.innerHTML = '<span class="status-tag status-active">有效</span>';
+                row.classList.remove('row-invalid');
+            }
+
+            cells[7].textContent = project.manager;
+            cells[8].textContent = project.business_execution_partner || '-';
+            cells[9].textContent = project.department || '-';
+            
+            // 金额列
+            const fee = parseFloat(project.estimated_fee);
+            cells[10].innerHTML = fee > 0 ? `<span class="amount">¥${fee.toLocaleString('zh-CN', {minimumFractionDigits: 2})}</span>` : '-';
+            
+            cells[11].textContent = project.project_date || '-';
+            cells[12].textContent = project.base_date || '-';
+            cells[14].textContent = project.remark || '-';
+            
+            applyFilters(); // 重新应用筛选
+        }
+
+        // 作废确认
+        function confirmInvalidate(projectId, projectNo) {
+            const modal = document.getElementById('invalidateModal');
+            document.getElementById('invalidateProjectInfo').textContent = `项目编号: ${projectNo}`;
+            
+            const confirmBtn = document.getElementById('confirmInvalidateBtn');
+            confirmBtn.onclick = function() {
+                fetch(`/api/project/${projectId}/invalidate`, { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // 重新获取项目数据并更新UI
+                            fetch(`/api/project/${projectId}`)
+                                .then(res => res.json())
+                                .then(d => {
+                                    if (d.success) updateTableRow(d.project);
+                                });
+                            closeInvalidateModal();
+                        } else {
+                            alert('操作失败: ' + data.error);
+                        }
+                    });
+            };
+            
+            modal.style.display = 'flex';
+        }
+
+        function closeInvalidateModal() {
+            document.getElementById('invalidateModal').style.display = 'none';
+        }
+
+        // 处理删除逻辑 (前置校验)
+        function handleDelete(projectId, projectNo) {
+            fetch(`/api/project/${projectId}/check_delete`)
+                .then(response => response.json())
+                .then(data => {
+                    const modal = document.getElementById('deleteModal');
+                    const title = document.getElementById('deleteModalTitle');
+                    const body = document.getElementById('deleteModalBody');
+                    const confirmBtn = document.getElementById('deleteConfirmBtn');
+                    
+                    if (data.success) {
+                        if (data.can_delete) {
+                            title.textContent = '确认删除';
+                            body.innerHTML = `<p>确定要删除项目 <strong>${projectNo}</strong> 吗？</p><p style="color: red; margin-top: 10px;">此操作不可恢复！</p>`;
+                            confirmBtn.style.display = 'inline-block';
+                            confirmBtn.onclick = function() {
+                                executeDelete(projectId);
+                            };
+                        } else {
+                            title.textContent = '不可删除';
+                            body.innerHTML = `<p class="warning-text">该项目编号后续已有项目创建，不可删除。如需停用，请使用“作废”功能。</p>`;
+                            confirmBtn.style.display = 'none'; // 隐藏确认按钮，只留取消按钮（关闭）
+                        }
+                        modal.style.display = 'flex';
+                    } else {
+                        alert('校验失败: ' + data.error);
+                    }
+                });
+        }
+
+        function executeDelete(projectId) {
+            fetch(`/api/project/${projectId}/delete`, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const row = document.querySelector(`tr[data-id="${projectId}"]`);
+                        if (row) row.remove();
+                        applyFilters();
+                        closeDeleteModal();
+                        alert(data.message);
+                    } else {
+                        alert('删除失败: ' + data.error);
+                    }
+                });
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').style.display = 'none';
+        }
+
+        // 确认删除项目 (旧版本，保留引用)
+        function confirmDelete(projectId, projectNo) {
+            handleDelete(projectId, projectNo);
         }
 
         // 关闭模态框
@@ -1110,21 +1612,36 @@
             }
         }
 
-        // 筛选项目 - 按类型
-        function filterByType(typeName) {
+        // 统一筛选逻辑
+        function applyFilters() {
+            const selectedTypes = getSelectedValues('dropdownType');
+            const selectedDepts = getSelectedValues('dropdownDept');
+            const selectedManagers = getSelectedValues('dropdownManager');
+            
+            const projectNoValue = document.getElementById('filterProjectNo').value.toLowerCase();
+            const contractNoValue = document.getElementById('filterContractNo').value.toLowerCase();
+            const clientValue = document.getElementById('filterClient').value.toLowerCase();
+
             const rows = document.querySelectorAll('#projectTable tbody tr');
 
             rows.forEach(row => {
                 const rowType = row.getAttribute('data-type');
+                const rowDept = row.getAttribute('data-department');
+                const rowManager = row.getAttribute('data-manager');
+                const rowProjectNo = row.getAttribute('data-project-no').toLowerCase();
+                const rowContractNo = row.getAttribute('data-contract-no').toLowerCase();
+                const rowClient = row.getAttribute('data-client').toLowerCase();
 
-                if (!typeName) {
-                    // 显示所有
-                    row.style.display = '';
-                } else if (rowType === typeName) {
-                    // 显示匹配的类型
+                const matchesType = selectedTypes.length === 0 || selectedTypes.includes(rowType);
+                const matchesDept = selectedDepts.length === 0 || selectedDepts.includes(rowDept);
+                const matchesManager = selectedManagers.length === 0 || selectedManagers.includes(rowManager);
+                const matchesProjectNo = !projectNoValue || rowProjectNo.includes(projectNoValue);
+                const matchesContractNo = !contractNoValue || rowContractNo.includes(contractNoValue);
+                const matchesClient = !clientValue || rowClient.includes(clientValue);
+
+                if (matchesType && matchesDept && matchesManager && matchesProjectNo && matchesContractNo && matchesClient) {
                     row.style.display = '';
                 } else {
-                    // 隐藏不匹配的
                     row.style.display = 'none';
                 }
             });
@@ -1132,61 +1649,154 @@
             updateVisibleCount();
         }
 
-        // 筛选项目 - 按部门
-        function filterByDepartment(department) {
-            const rows = document.querySelectorAll('#projectTable tbody tr');
+        // 获取选中的值
+        function getSelectedValues(dropdownId) {
+            const dropdown = document.getElementById(dropdownId);
+            const checkboxes = dropdown.querySelectorAll('.dropdown-options input[type="checkbox"]:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
 
-            rows.forEach(row => {
-                const rowDepartment = row.getAttribute('data-department');
+        // 初始化自定义下拉框
+        function initCustomDropdowns() {
+            const dropdowns = document.querySelectorAll('.custom-dropdown');
+            
+            dropdowns.forEach(dropdown => {
+                const toggle = dropdown.querySelector('.dropdown-toggle');
+                const searchInput = dropdown.querySelector('.dropdown-search input');
+                const optionsContainer = dropdown.querySelector('.dropdown-options');
+                
+                // 点击切换显示
+                toggle.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    // 关闭其他下拉框
+                    dropdowns.forEach(d => {
+                        if (d !== dropdown) d.classList.remove('active');
+                    });
+                    dropdown.classList.toggle('active');
+                    if (dropdown.classList.contains('active')) {
+                        searchInput.focus();
+                    }
+                });
 
-                if (!department) {
-                    // 显示所有
-                    row.style.display = '';
-                } else if (rowDepartment === department) {
-                    // 显示匹配的部门
-                    row.style.display = '';
-                } else {
-                    // 隐藏不匹配的
-                    row.style.display = 'none';
-                }
+                // 搜索功能
+                searchInput.addEventListener('input', () => {
+                    const filter = searchInput.value.toLowerCase();
+                    const options = optionsContainer.querySelectorAll('.dropdown-option');
+                    options.forEach(option => {
+                        const text = option.querySelector('label').textContent.toLowerCase();
+                        option.style.display = text.includes(filter) ? 'flex' : 'none';
+                    });
+                });
+
+                // 阻止菜单内点击关闭
+                dropdown.querySelector('.dropdown-menu').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                });
+
+                // 处理选项变更
+                optionsContainer.addEventListener('change', () => {
+                    updateDropdownText(dropdown);
+                    applyFilters();
+                });
             });
 
-            updateVisibleCount();
+            // 点击外部关闭
+            document.addEventListener('click', () => {
+                dropdowns.forEach(d => d.classList.remove('active'));
+            });
+        }
+
+        // 更新下拉框显示文字
+        function updateDropdownText(dropdown) {
+            const selected = getSelectedValues(dropdown.id);
+            const textElement = dropdown.querySelector('.selected-text');
+            const defaultText = dropdown.id === 'dropdownManager' ? '所有' : 
+                              (dropdown.id === 'dropdownType' ? '全部类型' : '全部部门');
+            
+            if (selected.length === 0) {
+                textElement.textContent = defaultText;
+            } else if (selected.length === 1) {
+                textElement.textContent = selected[0];
+            } else {
+                textElement.textContent = `已选 (${selected.length})`;
+            }
+        }
+
+        // 初始化负责人选项
+        function initManagerOptions() {
+            const managers = new Set();
+            const rows = document.querySelectorAll('#projectTable tbody tr');
+            rows.forEach(row => {
+                const manager = row.getAttribute('data-manager');
+                if (manager) managers.add(manager);
+            });
+
+            const container = document.getElementById('managerOptions');
+            container.innerHTML = '';
+            
+            Array.from(managers).sort().forEach((manager, index) => {
+                const div = document.createElement('div');
+                div.className = 'dropdown-option';
+                div.innerHTML = `
+                    <input type="checkbox" value="${manager}" id="mgr_${index}">
+                    <label for="mgr_${index}">${manager}</label>
+                `;
+                container.appendChild(div);
+            });
         }
 
         // 重置筛选
         function resetFilters() {
-            const rows = document.querySelectorAll('#projectTable tbody tr');
-            rows.forEach(row => {
-                row.style.display = '';
-            });
+            const checkboxes = document.querySelectorAll('.custom-dropdown input[type="checkbox"]');
+            checkboxes.forEach(cb => cb.checked = false);
+            
+            const dropdowns = document.querySelectorAll('.custom-dropdown');
+            dropdowns.forEach(d => updateDropdownText(d));
 
-            // 重置筛选下拉框
-            document.querySelector('select[onchange="filterByType(this.value)"]').value = '';
-            document.querySelector('select[onchange="filterByDepartment(this.value)"]').value = '';
-
-            updateVisibleCount();
+            document.getElementById('filterProjectNo').value = '';
+            document.getElementById('filterContractNo').value = '';
+            document.getElementById('filterClient').value = '';
+            
+            applyFilters();
         }
 
         // 更新可见项目数
         function updateVisibleCount() {
             const rows = document.querySelectorAll('#projectTable tbody tr');
             const visibleRows = Array.from(rows).filter(row => row.style.display !== 'none');
+            
+            // 重新计算自然序号 (倒序显示：第一行显示当前可见条目的总数)
+            visibleRows.forEach((row, index) => {
+                const seqCell = row.querySelector('.seq-num');
+                if (seqCell) {
+                    seqCell.textContent = visibleRows.length - index;
+                }
+            });
 
-            // 可以在这里更新显示计数，如果需要的话
-            // console.log(`显示 ${visibleRows.length} 个项目`);
+            // 更新页面显示的共计记录数
+            const countSpan = document.querySelector('.card-title span[style*="margin-left: auto"]');
+            if (countSpan) {
+                countSpan.textContent = `共 ${visibleRows.length} 个记录`;
+            }
         }
 
         // 点击模态框外部关闭
         window.onclick = function(event) {
-            const modal = document.getElementById('editModal');
-            if (event.target === modal) {
-                closeModal();
-            }
+            const editModal = document.getElementById('editModal');
+            const invalidateModal = document.getElementById('invalidateModal');
+            const deleteModal = document.getElementById('deleteModal');
+            
+            if (event.target === editModal) closeModal();
+            if (event.target === invalidateModal) closeInvalidateModal();
+            if (event.target === deleteModal) closeDeleteModal();
         };
 
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', function() {
+            // 初始化自定义下拉框
+            initManagerOptions();
+            initCustomDropdowns();
+
             // 绑定事件
             const typeSelect = document.getElementById('projectTypeSelect');
             if (typeSelect) {
@@ -1213,9 +1823,10 @@
                     }
 
                     // 验证必填字段
-                    const requiredFields = ['manager', 'client', 'evaluation_object', 'evaluation_scope', 'purpose'];
+                    const requiredFields = ['manager', 'business_execution_partner', 'client', 'evaluation_object', 'evaluation_scope', 'purpose'];
                     const fieldNames = {
                         'manager': '项目负责人',
+                        'business_execution_partner': '业务执行合伙人',
                         'client': '委托方名称',
                         'evaluation_object': '评估对象',
                         'evaluation_scope': '评估范围',
