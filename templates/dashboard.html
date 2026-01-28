@@ -587,7 +587,7 @@
         <div class="card">
             <div class="card-title">
                 <span class="icon">📝</span>
-                <span>新建项目立项</span>
+                <span>新建项目</span>
             </div>
 
             <form method="POST" action="{{ url_for('create_project') }}" id="projectForm">
@@ -616,35 +616,41 @@
                     </div>
                 </div>
 
-                <!-- 第二行：负责人和部门 -->
+                <!-- 第二行：项目负责人、业务执行合伙人和所属部门 -->
                 <div class="form-row">
                     <div class="form-group">
-                        <label class="required">负责人</label>
+                        <label class="required">项目负责人</label>
                         <input type="text" name="manager" required
-                               placeholder="请输入负责人姓名">
+                               placeholder="请输入项目负责人姓名">
+                    </div>
+
+                    <div class="form-group">
+                        <label>业务执行合伙人</label>
+                        <input type="text" name="business_execution_partner"
+                               placeholder="请输入业务执行合伙人姓名">
                     </div>
 
                     <div class="form-group">
                         <label>所属部门</label>
                         <select name="department">
-                            <option value="">请选择部门（可选）</option>
+                            <option value="">请选择所属部门（可选）</option>
                             <option value="业务1组（房地产）">业务1组（房地产）</option>
                             <option value="业务2组（固定资产）">业务2组（固定资产）</option>
                             <option value="业务3组（企业价值）">业务3组（企业价值）</option>
                             <option value="矿业权小组">矿业权小组</option>
                             <option value="质控部">质控部</option>
+                            <option value="其他">其他</option>
                         </select>
                     </div>
+                </div>
 
+                <!-- 第三行：预计收费金额、日期字段 -->
+                <div class="form-row">
                     <div class="form-group">
                         <label>预计收费金额（元）</label>
                         <input type="number" name="estimated_fee"
                                placeholder="0.00" step="0.01" min="0">
                     </div>
-                </div>
-
-                <!-- 第三行：日期字段 -->
-                <div class="form-row">
                     <div class="form-group">
                         <label>立项日期</label>
                         <input type="date" name="project_date">
@@ -669,16 +675,6 @@
                 </div>
 
                 <!-- 第四行：委托方名称 -->
-                <div class="form-group">
-                    <label>关联合同号</label>
-                    <input type="text" id="editRelatedContractNo" name="related_contract_no">
-                </div>
-
-                <div class="form-group">
-                    <label>备注</label>
-                    <textarea id="editRemark" name="remark" rows="2"></textarea>
-                </div>
-
                 <div class="form-group">
                     <label class="required">委托方名称</label>
                     <input type="text" name="client" required
@@ -747,9 +743,9 @@
         <div class="card">
             <div class="card-title">
                 <span class="icon">📋</span>
-                <span>项目列表</span>
+                <span>项目合同列表</span>
                 <span style="margin-left: auto; font-size: 14px; color: var(--gray);">
-                    共 {{ projects|length }} 个项目
+                    共 {{ projects|length }} 个记录
                 </span>
             </div>
 
@@ -772,12 +768,17 @@
                         <option value="业务1组（房地产）">业务1组（房地产）</option>
                         <option value="业务2组（固定资产）">业务2组（固定资产）</option>
                         <option value="业务3组（企业价值）">业务3组（企业价值）</option>
-                            <option value="矿业权小组">矿业权小组</option>
+                        <option value="矿业权小组">矿业权小组</option>
                         <option value="质控部">质控部</option>
+                        <option value="其他">其他</option>
                     </select>
                 </div>
 
-                <div style="margin-left: auto;">
+                <div style="margin-left: auto; display: flex; gap: 10px;">
+                    <button class="btn btn-success" onclick="location.href='/export/projects'" style="padding: 8px 16px;">
+                        <span>📊</span>
+                        <span>导出Excel</span>
+                    </button>
                     <button class="btn" onclick="resetFilters()" style="padding: 8px 16px;">
                         <span>🔄</span>
                         <span>重置筛选</span>
@@ -792,14 +793,13 @@
                         <tr>
                             <th>项目号</th>
                             <th>项目名称</th>
-                            <th>委托方</th>
+                            <th>委托方名称</th>
                             <th>评估类型</th>
-                            <th>负责人</th>
+                            <th>项目负责人</th>
+                            <th>业务执行合伙人</th>
                             <th>关联合同号</th>
-                            <th>部门</th>
-                            <th>预计收费</th>
-                            <!-- <th>关联合同号</th> -->
-                            <!-- <th>委托方</th> -->
+                            <th>所属部门</th>
+                            <th>预计收费金额（元）</th>
                             <th class="no-wrap">立项日期</th>
                             <th class="no-wrap">评估基准日</th>
                             <th class="no-wrap">创建时间</th>
@@ -817,6 +817,7 @@
                             <td>{{ project.client or '-' }}</td>
                             <td>{{ project.project_type }}</td>
                             <td>{{ project.manager }}</td>
+                            <td>{{ project.business_execution_partner or '-' }}</td>
                             <td>{{ project.related_contract_no or '-' }}</td>
                             <td>{{ project.department or '-' }}</td>
                             <td>
@@ -826,8 +827,6 @@
                                     -
                                 {% endif %}
                             </td>
-                            <!-- <td>{{ project.related_contract_no or '-' }}</td> -->
-                            <!-- <td>{{ project.client or '-' }}</td> -->
                             <td class="no-wrap">{{ project.project_date or '-' }}</td>
                             <td class="no-wrap">{{ project.base_date or '-' }}</td>
                             <td class="no-wrap">{{ project.created_date }}</td>
@@ -887,14 +886,15 @@
                 </div>
 
                 <div class="form-group">
-                    <label>部门</label>
+                    <label>所属部门</label>
                     <select name="department">
-                        <option value="">请选择部门（可选）</option>
+                        <option value="">请选择所属部门（可选）</option>
                         <option value="业务1组（房地产）">业务1组（房地产）</option>
                         <option value="业务2组（固定资产）">业务2组（固定资产）</option>
                         <option value="业务3组（企业价值）">业务3组（企业价值）</option>
-                            <option value="矿业权小组">矿业权小组</option>
+                        <option value="矿业权小组">矿业权小组</option>
                         <option value="质控部">质控部</option>
+                        <option value="其他">其他</option>
                     </select>
                 </div>
 
@@ -920,19 +920,25 @@
                 </div>
 
                 <div class="form-group">
-                    <label class="required">负责人</label>
+                    <label class="required">项目负责人</label>
                     <input type="text" id="editManager" name="manager" required>
                 </div>
 
                 <div class="form-group">
-                    <label>部门</label>
+                    <label>业务执行合伙人</label>
+                    <input type="text" id="editBusinessExecutionPartner" name="business_execution_partner">
+                </div>
+
+                <div class="form-group">
+                    <label>所属部门</label>
                     <select id="editDepartment" name="department">
-                        <option value="">请选择部门（可选）</option>
+                        <option value="">请选择所属部门（可选）</option>
                         <option value="业务1组（房地产）">业务1组（房地产）</option>
                         <option value="业务2组（固定资产）">业务2组（固定资产）</option>
                         <option value="业务3组（企业价值）">业务3组（企业价值）</option>
-                            <option value="矿业权小组">矿业权小组</option>
+                        <option value="矿业权小组">矿业权小组</option>
                         <option value="质控部">质控部</option>
+                        <option value="其他">其他</option>
                     </select>
                 </div>
 
@@ -1055,6 +1061,7 @@
                         document.getElementById('editProjectId').value = project.id;
                         document.getElementById('editProjectName').value = project.project_name || '';
                         document.getElementById('editManager').value = project.manager || '';
+                        document.getElementById('editBusinessExecutionPartner').value = project.business_execution_partner || '';
                         document.getElementById('editDepartment').value = project.department || '';
                         document.getElementById('editEstimatedFee').value = project.estimated_fee || '';
                         document.getElementById('editProjectDate').value = project.project_date || '';
@@ -1206,8 +1213,9 @@
                     }
 
                     // 验证必填字段
-                    const requiredFields = ['client', 'evaluation_object', 'evaluation_scope', 'purpose'];
+                    const requiredFields = ['manager', 'client', 'evaluation_object', 'evaluation_scope', 'purpose'];
                     const fieldNames = {
+                        'manager': '项目负责人',
                         'client': '委托方名称',
                         'evaluation_object': '评估对象',
                         'evaluation_scope': '评估范围',

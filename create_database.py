@@ -89,10 +89,14 @@ def create_database():
                        (
                            100
                        ) NOT NULL,
+                           business_execution_partner VARCHAR
+                       (
+                           100
+                       ) COMMENT '业务执行合伙人',
                            department VARCHAR
                        (
                            100
-                       ) COMMENT '业务1组（房地产）、业务2组（固定资产）、业务3组（企业价值）、质控部',
+                       ) COMMENT '业务1组（房地产）、业务2组（固定资产）、业务3组（企业价值）、质控部、其他',
                            estimated_fee DECIMAL
                        (
                            18,
@@ -185,7 +189,7 @@ def create_test_projects(cursor):
                                f"{eval_type}测试项目{seq}",
                                eval_type,
                                type_code,
-                               '测试负责人',
+                               '测试项目负责人',
                                departments[seq % len(departments)],
                                10000.00 + seq * 1000,
                                '2026-01-06',

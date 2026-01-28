@@ -4,6 +4,9 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from datetime import datetime
 import os
 import sys
+import pandas as pd
+import io
+from flask import send_file
 
 
 # ==================== 配置区域 ====================
@@ -37,7 +40,8 @@ class Config:
         '业务2组（固定资产）',
         '业务3组（企业价值）',
         '矿业权小组',
-        '质控部'
+        '质控部',
+        '其他'
     ]
 
     # Flask配置
@@ -356,6 +360,7 @@ def dashboard():
                                       project_name,
                                       project_type,
                                       manager,
+                                      business_execution_partner,
                                       department,
                                       estimated_fee,
                                       client,
@@ -408,6 +413,7 @@ def create_project():
         project_type = request.form.get('project_type', '').strip()
         project_name = request.form.get('project_name', '').strip()
         manager = request.form.get('manager', '').strip()
+        business_execution_partner = request.form.get('business_execution_partner', '').strip()
 
         # 验证必要字段
         if not project_type or project_type not in config.EVALUATION_TYPES:
@@ -419,7 +425,7 @@ def create_project():
             return redirect(url_for('dashboard'))
 
         if not manager:
-            flash('请输入负责人', 'error')
+            flash('请输入项目负责人', 'error')
             return redirect(url_for('dashboard'))
 
         # 验证新增的必填字段
@@ -469,16 +475,17 @@ def create_project():
                 cursor.execute("""
                                INSERT INTO projects
                                (project_no, project_name, project_type, type_code,
-                                manager, department, estimated_fee, project_date, base_date,
+                                manager, business_execution_partner, department, estimated_fee, project_date, base_date,
                                 client, evaluation_object, evaluation_scope, purpose, related_contract_no, remark,
                                 created_by)
-                               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                                """, (
                                    project_no,
                                    project_name,
                                    project_type,
                                    type_code,
                                    manager,
+                                   business_execution_partner,
                                    request.form.get('department', '').strip(),
                                    estimated_fee,
                                    project_date,
@@ -534,6 +541,7 @@ def edit_project(project_id):
                            UPDATE projects
                            SET project_name      = %s,
                                manager           = %s,
+                               business_execution_partner = %s,
                                department        = %s,
                                estimated_fee     = %s,
                                project_date      = %s,
@@ -549,6 +557,7 @@ def edit_project(project_id):
                            """, (
                                request.form.get('project_name', '').strip(),
                                request.form.get('manager', '').strip(),
+                               request.form.get('business_execution_partner', '').strip(),
                                request.form.get('department', '').strip(),
                                float(request.form.get('estimated_fee', '0') or 0),
                                request.form.get('project_date') or None,
@@ -613,6 +622,95 @@ def delete_project(project_id):
     return redirect(url_for('dashboard'))
 
 
+# ---------- 导出Excel ----------
+@app.route('/export/projects')
+def export_projects():
+    """导出项目列表到Excel"""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    if not conn:
+        flash('数据库连接失败', 'error')
+        return redirect(url_for('dashboard'))
+
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                           SELECT project_no as '项目号',
+                                  project_name as '项目名称',
+                                  client as '委托方',
+                                  project_type as '评估类型',
+                                  manager as '项目负责人',
+                                  business_execution_partner as '业务执行合伙人',
+                                  related_contract_no as '关联合同号',
+                                  department as '所属部门',
+                                  estimated_fee as '预计收费金额',
+                                  project_date as '立项日期',
+                                  base_date as '评估基准日',
+                                  evaluation_object as '评估对象',
+                                  evaluation_scope as '评估范围',
+                                  purpose as '经济行为目的',
+                                  remark as '备注',
+                                  created_by as '创建人',
+                                  DATE_FORMAT(created_date, '%Y-%m-%d %H:%i:%s') as '创建时间'
+                           FROM projects
+                           ORDER BY created_date DESC
+                           """)
+            projects = cursor.fetchall()
+
+        if not projects:
+            flash('没有可导出的数据', 'info')
+            return redirect(url_for('dashboard'))
+
+        # 转换为DataFrame
+        df = pd.DataFrame(projects)
+
+        # 创建内存中的字节流
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False, sheet_name='项目列表')
+            
+            # 获取xlsxwriter对象以设置样式
+            workbook = writer.book
+            worksheet = writer.sheets['项目列表']
+            
+            # 设置列宽
+            header_format = workbook.add_format({'bold': True, 'bg_color': '#D7E4BC', 'border': 1})
+            for col_num, value in enumerate(df.columns.values):
+                worksheet.write(0, col_num, value, header_format)
+                # 改进的列宽计算，处理可能出现的类型错误
+                try:
+                    # 获取该列所有值的最大长度
+                    max_val_len = df[value].apply(lambda x: len(str(x)) if pd.notnull(x) else 0).max()
+                    # 与表头长度比较
+                    column_len = max(max_val_len, len(str(value))) + 2
+                except:
+                    # 如果计算失败，使用默认宽度
+                    column_len = 20
+                worksheet.set_column(col_num, col_num, min(column_len, 50))
+
+        output.seek(0)
+        
+        # 文件命名：合同列表_导出_YYYYMMDD_HHMMSS.xlsx
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"合同列表_导出_{timestamp}.xlsx"
+
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=filename
+        )
+
+    except Exception as e:
+        print(f"[导出] 错误: {e}")
+        flash(f'导出失败：{str(e)}', 'error')
+        return redirect(url_for('dashboard'))
+    finally:
+        conn.close()
+
+
 # ---------- API接口 ----------
 @app.route('/api/next_project_no/<project_type>')
 def api_next_project_no(project_type):
@@ -653,6 +751,7 @@ def api_get_project(project_id):
                                   project_name,
                                   project_type,
                                   manager,
+                                  business_execution_partner,
                                   department,
                                   estimated_fee,
                                   DATE_FORMAT(project_date, '%%Y-%%m-%%d') as project_date,
@@ -804,10 +903,14 @@ USE \
            ( \
                100 \
            ) NOT NULL,
+               business_execution_partner VARCHAR \
+           ( \
+               100 \
+           ) COMMENT '业务执行合伙人',
                department VARCHAR \
            ( \
                100 \
-           ) COMMENT '业务1组（房地产）、业务2组（固定资产）、业务3组（企业价值）、质控部',
+           ) COMMENT '业务1组（房地产）、业务2组（固定资产）、业务3组（企业价值）、质控部、其他',
                estimated_fee DECIMAL \
            ( \
                18, \
