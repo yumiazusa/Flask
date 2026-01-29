@@ -370,7 +370,7 @@ def dashboard():
                                       base_date,
                                       related_contract_no,
                                       remark,
-                                      DATE_FORMAT(created_date, '%%Y/%%m/%%d %%H:%%i') as created_date
+                                      DATE_FORMAT(created_date, '%Y/%m/%d %H:%i') as created_date
                                FROM projects
                                ORDER BY created_date DESC
                                """)
