@@ -370,7 +370,7 @@ def dashboard():
                                       base_date,
                                       related_contract_no,
                                       remark,
-                                      DATE_FORMAT(created_date, '%Y/%m/%d %H:%i') as created_date
+                                      DATE_FORMAT(created_date, '%%Y/%%m/%%d %%H:%%i') as created_date
                                FROM projects
                                ORDER BY created_date DESC
                                """)
@@ -598,7 +598,7 @@ def edit_project(project_id):
                            SELECT id, project_no, project_name, project_type, status, manager, 
                                   business_execution_partner, department, estimated_fee, client,
                                   related_contract_no, remark, project_date, base_date,
-                                  DATE_FORMAT(created_date, '%Y/%m/%d %H:%i') as created_date
+                                  DATE_FORMAT(created_date, '%%Y/%%m/%%d %%H:%%i') as created_date
                            FROM projects WHERE id = %s
                            """, (project_id,))
             updated_project = cursor.fetchone()
