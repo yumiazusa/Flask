@@ -118,10 +118,12 @@
         }
 
         .stat-value {
-            font-size: 32px;
+            font-size: 24px;
             font-weight: bold;
             color: var(--secondary);
             margin: 10px 0;
+            white-space: nowrap;
+            padding: 0 5px;
         }
 
         .stat-label {
@@ -764,6 +766,11 @@
             <div class="stat-label">{{ type_name }}</div>
         </div>
         {% endfor %}
+        <!-- 预计收费总额卡片移动到最后 -->
+        <div class="stat-card">
+            <div class="stat-value">{{ "{:,.2f}".format(stats.total_fee or 0) }}</div>
+            <div class="stat-label">预计收费（万元）</div>
+        </div>
     </div>
     {% endif %}
 

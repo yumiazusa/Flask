@@ -231,6 +231,10 @@ def get_statistics():
             cursor.execute("SELECT COUNT(*) as count FROM projects")
             stats['total'] = cursor.fetchone()['count'] or 0
 
+            # 预计收费总额 (排除作废项目，单位：万元)
+            cursor.execute("SELECT SUM(estimated_fee) / 10000.0 as total_fee FROM projects WHERE status != 'invalid'")
+            stats['total_fee'] = cursor.fetchone()['total_fee'] or 0.0
+
             # 按类型统计
             cursor.execute("""
                            SELECT project_type, COUNT(*) as count
