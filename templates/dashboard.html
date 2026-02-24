@@ -687,41 +687,115 @@
 
         /* 响应式调整 */
         @media (max-width: 768px) {
+            .header {
+                padding: 10px 15px; /* 减少内边距 */
+            }
+
             .header-content {
                 flex-direction: column;
-                gap: 15px;
+                gap: 10px;
                 text-align: center;
+            }
+
+            .header-left h1 {
+                font-size: 20px; /* 减小标题字号 */
             }
 
             .user-info {
                 flex-direction: column;
-                gap: 10px;
+                gap: 8px;
+                width: 100%;
             }
 
             .user-details {
                 text-align: center;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 2px;
+            }
+
+            .logout-btn {
+                width: 100%; /* 按钮全宽 */
+                padding: 10px;
+            }
+
+            /* 统计卡片调整 */
+            .stats-container {
+                grid-template-columns: repeat(2, 1fr); /* 强制双列 */
+                gap: 10px;
+                padding: 0 15px;
+            }
+
+            .stat-card {
+                padding: 15px 10px;
+            }
+
+            .stat-value {
+                font-size: 20px; /* 减小数值字号 */
+            }
+
+            .stat-label {
+                font-size: 12px;
             }
 
             .form-row {
                 grid-template-columns: 1fr;
+                gap: 15px;
             }
 
             .container {
-                padding: 0 15px 30px;
+                padding: 0 10px 20px;
             }
 
             .card {
-                padding: 20px;
+                padding: 15px;
+                margin-bottom: 15px;
+            }
+
+            .card-title {
+                font-size: 18px;
             }
 
             .action-buttons {
-                flex-direction: column;
+                flex-direction: row; /* 保持按钮横向排列，但允许换行 */
+                flex-wrap: wrap;
                 gap: 5px;
+                white-space: normal;
+            }
+            
+            .btn-sm {
+                padding: 4px 8px;
+                font-size: 12px;
             }
 
             .filter-container {
                 flex-direction: column;
                 gap: 10px;
+                align-items: stretch; /* 拉伸占满宽度 */
+            }
+            
+            .filter-group {
+                width: 100%;
+            }
+            
+            .filter-input, .custom-dropdown, .dropdown-toggle {
+                width: 100%;
+                min-width: 0; /* 允许缩小 */
+            }
+
+            /* 模态框适配 */
+            .modal-content {
+                width: 95%;
+                margin: 10px;
+                padding: 20px;
+                max-height: 90vh;
+            }
+            
+            .table-container {
+                margin-top: 10px;
+                border: none; /* 移动端去掉边框以增加可视区域 */
+                box-shadow: none;
             }
         }
     </style>
@@ -1167,55 +1241,7 @@
             {% endif %}
         </div>
 
-        <!-- 用户管理（仅管理员可见） -->
-        {% if user.username == 'admin' %}
-        <div class="card">
-            <div class="card-title">
-                <span class="icon">👥</span>
-                <span>用户管理</span>
-            </div>
 
-            <form method="POST" action="{{ url_for('add_user') }}">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="required">用户名</label>
-                        <input type="text" name="username" required
-                               placeholder="设置用户名">
-                    </div>
-
-                    <div class="form-group">
-                        <label class="required">密码</label>
-                        <input type="password" name="password" required
-                               placeholder="设置密码">
-                    </div>
-
-                    <div class="form-group">
-                        <label>真实姓名</label>
-                        <input type="text" name="realname"
-                               placeholder="真实姓名">
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>所属部门</label>
-                    <select name="department">
-                        <option value="">请选择所属部门（可选）</option>
-                        <option value="业务1组（房地产）">业务1组（房地产）</option>
-                        <option value="业务2组（固定资产）">业务2组（固定资产）</option>
-                        <option value="业务3组（企业价值）">业务3组（企业价值）</option>
-                        <option value="矿业权小组">矿业权小组</option>
-                        <option value="质控部">质控部</option>
-                        <option value="其他">其他</option>
-                    </select>
-                </div>
-
-                <button type="submit" class="btn btn-success">
-                    <span>➕</span>
-                    <span>添加用户</span>
-                </button>
-            </form>
-        </div>
-        {% endif %}
     </div>
 
     <!-- 编辑项目模态框 -->
@@ -1456,11 +1482,9 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // 更新表格行
-                    updateTableRow(data.project);
-                    closeModal();
-                    // 可选：显示成功提示
+                    // 立即刷新页面
                     alert(data.message);
+                    window.location.reload();
                 } else {
                     alert('更新失败: ' + data.error);
                 }
