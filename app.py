@@ -406,6 +406,61 @@ def dashboard():
                            project_year=config.PROJECT_YEAR)
 
 
+@app.route('/api/check_duplicate')
+def api_check_duplicate():
+    """API: 检查项目是否重复"""
+    if 'user_id' not in session:
+        return jsonify({'error': '未登录'}), 401
+
+    project_name = request.args.get('project_name', '').strip()
+    client = request.args.get('client', '').strip()
+    estimated_fee = request.args.get('estimated_fee', '').strip()
+
+    if not estimated_fee:
+        return jsonify({'success': True, 'duplicates': []})
+
+    try:
+        fee_val = float(estimated_fee)
+    except ValueError:
+        return jsonify({'success': True, 'duplicates': []})
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': '数据库连接失败'}), 500
+
+    try:
+        with conn.cursor() as cursor:
+            # 查询疑似重复的项目
+            # 规则：(委托方 + 金额) OR (项目名称 + 金额)
+            cursor.execute("""
+                SELECT 
+                    id, project_no, project_name, client, estimated_fee, 
+                    manager, project_type, status,
+                    DATE_FORMAT(created_date, '%%Y-%%m-%%d %%H:%%i') as created_date
+                FROM projects 
+                WHERE (client = %s AND ABS(estimated_fee - %s) < 0.01)
+                   OR (project_name = %s AND ABS(estimated_fee - %s) < 0.01)
+                ORDER BY created_date DESC
+            """, (client, fee_val, project_name, fee_val))
+            
+            duplicates = cursor.fetchall()
+            
+            # 处理数据格式
+            for p in duplicates:
+                p['estimated_fee'] = float(p['estimated_fee'])
+                
+            return jsonify({
+                'success': True, 
+                'duplicates': duplicates,
+                'count': len(duplicates)
+            })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
 # ---------- 创建项目 ----------
 @app.route('/project/create', methods=['POST'])
 def create_project():
@@ -449,6 +504,12 @@ def create_project():
             if not request.form.get(field, '').strip():
                 flash(f'请输入{name}', 'error')
                 return redirect(url_for('dashboard'))
+        
+        # 检查是否为强制提交（即已确认重复风险）
+        is_forced = request.form.get('force_submit') == '1'
+        if is_forced:
+            # 实际应用中可写入数据库日志表
+            print(f"[日志] 用户 {session.get('username')} 强制提交了疑似重复项目: {project_name}, 委托方: {request.form.get('client')}")
 
         # 生成项目号
         project_no, error_msg = generate_project_no(project_type)
@@ -779,6 +840,11 @@ def export_projects():
                                   related_contract_no as '关联合同号',
                                   department as '所属部门',
                                   estimated_fee as '预计收费金额',
+                                  CASE 
+                                    WHEN status = 'active' THEN '有效'
+                                    WHEN status = 'invalid' THEN '已作废'
+                                    ELSE status 
+                                  END as '状态',
                                   project_date as '立项日期',
                                   base_date as '评估基准日',
                                   evaluation_object as '评估对象',

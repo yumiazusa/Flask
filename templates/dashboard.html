@@ -1365,6 +1365,55 @@
         </div>
     </div>
 
+    <!-- 疑似重复提示模态框 -->
+    <div id="duplicateWarningModal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <h3 style="color: #f39c12; display: flex; align-items: center; gap: 10px;">
+                <span>⚠️</span> 系统提示
+            </h3>
+            <div style="margin: 20px 0; font-size: 16px; line-height: 1.5;">
+                检测到历史项目列表中有疑似重复的信息，请检查是否合立项重复！
+            </div>
+            <div style="text-align: right; margin-top: 30px;">
+                <button class="btn" onclick="closeDuplicateWarningModal()" style="margin-right: 10px;">取消</button>
+                <button class="btn btn-primary" onclick="showDuplicateDetails()">查看重复项目情况</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 重复项目详情模态框 -->
+    <div id="duplicateDetailsModal" class="modal">
+        <div class="modal-content" style="max-width: 90%; width: 1000px;">
+            <h3>重复项目详情</h3>
+            <div class="table-container" style="max-height: 50vh; margin-bottom: 20px;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>项目号</th>
+                            <th>项目名称</th>
+                            <th>委托方</th>
+                            <th>项目负责人</th>
+                            <th>预计收费</th>
+                            <th>状态</th>
+                            <th>创建时间</th>
+                        </tr>
+                    </thead>
+                    <tbody id="duplicateTableBody">
+                        <!-- 动态填充 -->
+                    </tbody>
+                </table>
+            </div>
+            <div style="text-align: right; padding-top: 20px; border-top: 1px solid #eee;">
+                <button class="btn btn-danger" onclick="cancelSubmission()" style="margin-right: 15px;">
+                    <span>✖️</span> 存在重复，取消提交
+                </button>
+                <button class="btn btn-success" onclick="confirmForceSubmit()">
+                    <span>✔️</span> 确认无重复，继续提交
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // 类型代码映射
         const typeCodeMap = JSON.parse('{{ evaluation_types|tojson|safe }}');
@@ -1834,21 +1883,26 @@
                 typeSelect.addEventListener('change', updateProjectNoPreview);
             }
 
-            // 表单验证
+            // 表单验证与提交逻辑
             const form = document.getElementById('projectForm');
             if (form) {
                 form.addEventListener('submit', function(e) {
+                    // 如果已经标记为强制提交，则直接放行
+                    if (this.dataset.forceSubmit === 'true') {
+                        return true;
+                    }
+
+                    e.preventDefault(); // 阻止默认提交
+
                     const projectType = document.getElementById('projectTypeSelect').value;
                     const projectName = document.getElementById('projectNameInput').value;
 
                     if (!projectType) {
-                        e.preventDefault();
                         alert('请选择评估类型！');
                         return false;
                     }
 
                     if (!projectName) {
-                        e.preventDefault();
                         alert('请填写项目名称！');
                         return false;
                     }
@@ -1867,17 +1921,43 @@
                     for (const field of requiredFields) {
                         const input = form.querySelector(`[name="${field}"]`);
                         if (input && !input.value.trim()) {
-                            e.preventDefault();
                             alert(`请填写${fieldNames[field]}！`);
                             input.focus();
                             return false;
                         }
                     }
 
-                    return true;
+                    // 重复性校验
+                    const client = form.querySelector('[name="client"]').value;
+                    const estimatedFee = form.querySelector('[name="estimated_fee"]').value;
+
+                    // 如果没有金额，后端校验也会跳过，但为了逻辑完整，这里也发请求
+                    const params = new URLSearchParams({
+                        project_name: projectName,
+                        client: client,
+                        estimated_fee: estimatedFee
+                    });
+
+                    fetch(`/api/check_duplicate?${params.toString()}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success && data.duplicates && data.duplicates.length > 0) {
+                                // 发现重复，保存数据并弹窗
+                                window.currentDuplicates = data.duplicates;
+                                document.getElementById('duplicateWarningModal').style.display = 'flex';
+                            } else {
+                                // 无重复，直接提交
+                                form.submit();
+                            }
+                        })
+                        .catch(error => {
+                            console.error('校验失败:', error);
+                            // 出错时保守起见，直接提交或提示用户
+                            form.submit();
+                        });
                 });
             }
-
+            
             // 自动聚焦到项目类型选择框
             const projectTypeSelect = document.getElementById('projectTypeSelect');
             if (projectTypeSelect) {
@@ -1887,6 +1967,71 @@
             // 初始化可见项目数
             updateVisibleCount();
         });
+
+        // ---------------- 重复校验相关函数 ----------------
+
+        function closeDuplicateWarningModal() {
+            document.getElementById('duplicateWarningModal').style.display = 'none';
+        }
+
+        function showDuplicateDetails() {
+            closeDuplicateWarningModal();
+            const modal = document.getElementById('duplicateDetailsModal');
+            const tbody = document.getElementById('duplicateTableBody');
+            tbody.innerHTML = '';
+
+            if (window.currentDuplicates) {
+                window.currentDuplicates.forEach(item => {
+                    const tr = document.createElement('tr');
+                    
+                    let statusHtml = '<span class="status-tag status-active">有效</span>';
+                    if (item.status === 'invalid') {
+                        statusHtml = '<span class="status-tag status-invalid">已作废</span>';
+                        tr.classList.add('row-invalid');
+                    }
+
+                    const fee = parseFloat(item.estimated_fee);
+                    const feeHtml = fee > 0 ? `<span class="amount">¥${fee.toLocaleString('zh-CN', {minimumFractionDigits: 2})}</span>` : '-';
+
+                    tr.innerHTML = `
+                        <td><span class="project-no">${item.project_no}</span></td>
+                        <td>${item.project_name}</td>
+                        <td>${item.client || '-'}</td>
+                        <td>${item.manager}</td>
+                        <td>${feeHtml}</td>
+                        <td>${statusHtml}</td>
+                        <td class="no-wrap">${item.created_date}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+            modal.style.display = 'flex';
+        }
+
+        function cancelSubmission() {
+            document.getElementById('duplicateDetailsModal').style.display = 'none';
+            // 清除暂存的重复数据
+            window.currentDuplicates = null;
+        }
+
+        function confirmForceSubmit() {
+            const form = document.getElementById('projectForm');
+            // 添加强制提交标记
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = 'force_submit';
+            hiddenInput.value = '1';
+            form.appendChild(hiddenInput);
+            
+            // 标记 dataset 以跳过监听器中的校验
+            form.dataset.forceSubmit = 'true';
+            
+            // 关闭模态框
+            document.getElementById('duplicateDetailsModal').style.display = 'none';
+            
+            // 提交表单
+            form.submit();
+        }
     </script>
 </body>
 </html>
