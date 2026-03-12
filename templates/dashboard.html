@@ -1183,7 +1183,7 @@
                             <td>
                                 <span class="project-no">{{ project.project_no }}</span>
                             </td>
-                            <td>{{ project.project_name }}</td>
+                            <td title="{{ project.project_name }}">{{ project.project_name }}</td>
                             <td>{{ project.client or '-' }}</td>
                             <td>{{ project.related_contract_no or '-' }}</td>
                             <td>{{ project.project_type }}</td>
@@ -1561,6 +1561,7 @@
             const cells = row.cells;
             cells[1].querySelector('.project-no').textContent = project.project_no;
             cells[2].textContent = project.project_name;
+            cells[2].title = project.project_name;
             cells[3].textContent = project.client || '-';
             cells[4].textContent = project.related_contract_no || '-';
             cells[5].textContent = project.project_type;

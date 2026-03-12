@@ -1323,17 +1323,8 @@ if __name__ == '__main__':
         <div class="system-notice">
             <h4>⚠️ 重要提示：</h4>
             <ul>
-                <li>登录人员请先使用管理员账号登录，添加用户后，切换至添加的用户登录</li>
-                <li>本系统为临时使用，待正式系统上线后不再使用！</li>
-                <li>系统管理员账号可以多人同时登录</li>
+                <li><strong>本临时系统用于中和金乾非房地产项目的立项工作，房地产项目则在共享表格中进行操作，提醒系统使用人注意。</strong></li>
             </ul>
-        </div>
-
-        <div class="default-account">
-            <p>默认管理员账号</p>
-            <p>用户名: <strong>admin</strong></p>
-            <p>密码: <strong>admin123</strong></p>
-            <p>部门: <strong>质控部</strong></p>
         </div>
 
         <div class="system-version">
