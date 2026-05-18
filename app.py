@@ -1,12 +1,35 @@
 # app.py - 项目立项系统主程序（MySQL版）- 优化版
-import pymysql
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
-from datetime import datetime
+import gc
+import math
 import os
 import sys
-import pandas as pd
-import io
-from flask import send_file
+import tempfile
+import threading
+import time
+import tracemalloc
+from collections import OrderedDict
+from datetime import datetime
+from queue import Empty, Full, LifoQueue
+
+import pymysql
+import xlsxwriter
+from flask import (
+    Flask,
+    after_this_request,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    session,
+    url_for,
+)
+
+try:
+    import psutil
+except ImportError:
+    psutil = None
 
 
 # ==================== 配置区域 ====================
@@ -45,9 +68,27 @@ class Config:
     ]
 
     # Flask配置
-    DEBUG = True
+    DEBUG = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     HOST = '0.0.0.0'
     PORT = 5500
+
+    # 列表分页配置
+    PAGE_SIZE = 50
+    MAX_PAGE_SIZE = 100
+
+    # 低配服务器下的数据库连接池配置
+    DB_POOL_SIZE = 4
+    DB_POOL_WAIT_TIMEOUT = 5
+    DB_POOL_RECYCLE_SECONDS = 1800
+
+    # 缓存与导出控制
+    STATS_CACHE_TTL_SECONDS = 30
+    STATS_CACHE_MAX_ENTRIES = 16
+    EXPORT_FETCH_BATCH_SIZE = 500
+
+    # 运行时内存诊断阈值
+    MEMORY_SOFT_LIMIT_MB = 2300
+    TRACEMALLOC_FRAMES = 10
 
 
 # 创建配置实例
@@ -57,22 +98,193 @@ config = Config()
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY
 
+if not tracemalloc.is_tracing():
+    tracemalloc.start(config.TRACEMALLOC_FRAMES)
 
-# ==================== MySQL数据库连接函数 ====================
-def get_db_connection():
-    """获取MySQL数据库连接"""
-    try:
-        conn = pymysql.connect(
+
+class TTLCacheLRU:
+    """带TTL的轻量LRU缓存，避免统计结果无限驻留内存。"""
+
+    def __init__(self, max_entries=16, ttl_seconds=30):
+        self.max_entries = max_entries
+        self.ttl_seconds = ttl_seconds
+        self._store = OrderedDict()
+        self._lock = threading.Lock()
+
+    def get(self, key):
+        now = time.time()
+        with self._lock:
+            item = self._store.get(key)
+            if not item:
+                return None
+            expires_at, value = item
+            if expires_at <= now:
+                self._store.pop(key, None)
+                return None
+            self._store.move_to_end(key)
+            return value
+
+    def set(self, key, value):
+        expires_at = time.time() + self.ttl_seconds
+        with self._lock:
+            self._store[key] = (expires_at, value)
+            self._store.move_to_end(key)
+            while len(self._store) > self.max_entries:
+                self._store.popitem(last=False)
+
+    def clear(self):
+        with self._lock:
+            self._store.clear()
+
+    def stats(self):
+        with self._lock:
+            return {
+                'entries': len(self._store),
+                'max_entries': self.max_entries,
+                'ttl_seconds': self.ttl_seconds
+            }
+
+
+class PooledConnection:
+    """将 close() 转换为归还连接池，兼容原有业务代码。"""
+
+    def __init__(self, pool, conn):
+        self._pool = pool
+        self._conn = conn
+        self._closed = False
+
+    def close(self):
+        if self._closed:
+            return
+        self._closed = True
+        if self._conn is not None:
+            self._pool.release(self._conn)
+            self._conn = None
+
+    def real_close(self):
+        if self._closed:
+            return
+        self._closed = True
+        if self._conn is not None:
+            self._pool.discard(self._conn)
+            self._conn = None
+
+    def __getattr__(self, item):
+        if self._conn is None:
+            raise RuntimeError('数据库连接已关闭')
+        return getattr(self._conn, item)
+
+    def __bool__(self):
+        return self._conn is not None
+
+
+class MySQLConnectionPool:
+    """轻量连接池，限制并发连接总数并回收空闲连接。"""
+
+    def __init__(self, max_size=4, wait_timeout=5, recycle_seconds=1800):
+        self.max_size = max_size
+        self.wait_timeout = wait_timeout
+        self.recycle_seconds = recycle_seconds
+        self._queue = LifoQueue(maxsize=max_size)
+        self._lock = threading.Lock()
+        self._created = 0
+
+    def _create_connection(self):
+        return pymysql.connect(
             host=config.MYSQL_HOST,
             port=config.MYSQL_PORT,
             user=config.MYSQL_USERNAME,
             password=config.MYSQL_PASSWORD,
             database=config.MYSQL_DATABASE,
             charset=config.MYSQL_CHARSET,
-            cursorclass=pymysql.cursors.DictCursor  # 返回字典格式的结果
+            cursorclass=pymysql.cursors.DictCursor,
+            connect_timeout=5,
+            read_timeout=30,
+            write_timeout=30,
+            autocommit=False
         )
-        return conn
 
+    def _is_usable(self, conn):
+        try:
+            conn.ping(reconnect=True)
+            return True
+        except Exception:
+            return False
+
+    def acquire(self):
+        while True:
+            try:
+                pooled_at, conn = self._queue.get_nowait()
+                if (time.time() - pooled_at) > self.recycle_seconds or not self._is_usable(conn):
+                    self.discard(conn)
+                    continue
+                return PooledConnection(self, conn)
+            except Empty:
+                break
+
+        with self._lock:
+            if self._created < self.max_size:
+                conn = self._create_connection()
+                self._created += 1
+                return PooledConnection(self, conn)
+
+        pooled_at, conn = self._queue.get(timeout=self.wait_timeout)
+        if (time.time() - pooled_at) > self.recycle_seconds or not self._is_usable(conn):
+            self.discard(conn)
+            return self.acquire()
+        return PooledConnection(self, conn)
+
+    def release(self, conn):
+        try:
+            conn.rollback()
+        except Exception:
+            self.discard(conn)
+            return
+
+        if not self._is_usable(conn):
+            self.discard(conn)
+            return
+
+        try:
+            self._queue.put_nowait((time.time(), conn))
+        except Full:
+            self.discard(conn)
+
+    def discard(self, conn):
+        if conn is None:
+            return
+        try:
+            conn.close()
+        except Exception:
+            pass
+        with self._lock:
+            self._created = max(0, self._created - 1)
+
+    def stats(self):
+        return {
+            'max_size': self.max_size,
+            'created': self._created,
+            'idle': self._queue.qsize(),
+            'in_use': max(0, self._created - self._queue.qsize())
+        }
+
+
+db_pool = MySQLConnectionPool(
+    max_size=config.DB_POOL_SIZE,
+    wait_timeout=config.DB_POOL_WAIT_TIMEOUT,
+    recycle_seconds=config.DB_POOL_RECYCLE_SECONDS
+)
+stats_cache = TTLCacheLRU(
+    max_entries=config.STATS_CACHE_MAX_ENTRIES,
+    ttl_seconds=config.STATS_CACHE_TTL_SECONDS
+)
+
+
+# ==================== MySQL数据库连接函数 ====================
+def get_db_connection():
+    """获取MySQL数据库连接"""
+    try:
+        return db_pool.acquire()
     except pymysql.OperationalError as e:
         print(f"[错误] MySQL连接错误: {e}")
         print(f"请检查MySQL服务是否运行在 {config.MYSQL_HOST}:{config.MYSQL_PORT}")
@@ -84,6 +296,171 @@ def get_db_connection():
     except Exception as e:
         print(f"[错误] 数据库连接失败: {e}")
         return None
+
+
+def invalidate_runtime_caches():
+    """数据变更后主动清理短期缓存，避免旧对象常驻。"""
+    stats_cache.clear()
+
+
+def get_process_memory_mb():
+    """优先读取进程RSS，未安装psutil时退化为Python堆跟踪值。"""
+    if psutil is not None:
+        try:
+            return round(psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024), 2)
+        except Exception:
+            pass
+
+    if tracemalloc.is_tracing():
+        current, _peak = tracemalloc.get_traced_memory()
+        return round(current / (1024 * 1024), 2)
+
+    return 0.0
+
+
+def collect_memory_report():
+    """输出可直接用于排障的运行时内存信息。"""
+    current, peak = tracemalloc.get_traced_memory() if tracemalloc.is_tracing() else (0, 0)
+    top_stats = []
+    if tracemalloc.is_tracing():
+        snapshot = tracemalloc.take_snapshot()
+        for stat in snapshot.statistics('lineno')[:8]:
+            top_stats.append({
+                'trace': str(stat.traceback[0]),
+                'size_kb': round(stat.size / 1024, 2),
+                'count': stat.count
+            })
+
+    return {
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'process_memory_mb': get_process_memory_mb(),
+        'python_heap_mb': round(current / (1024 * 1024), 2),
+        'python_heap_peak_mb': round(peak / (1024 * 1024), 2),
+        'gc_counts': gc.get_count(),
+        'db_pool': db_pool.stats(),
+        'stats_cache': stats_cache.stats(),
+        'top_allocations': top_stats
+    }
+
+
+def normalize_record(record):
+    """统一把 None 转为空字符串，减少模板与前端判空分支。"""
+    if not record:
+        return record
+    for key in record:
+        if record[key] is None:
+            record[key] = ''
+    return record
+
+
+def parse_multi_value_arg(name):
+    """兼容 checkbox 重复参数与逗号拼接参数。"""
+    values = []
+    for raw in request.args.getlist(name):
+        for item in raw.split(','):
+            item = item.strip()
+            if item:
+                values.append(item)
+    return values
+
+
+def get_filter_state():
+    return {
+        'types': parse_multi_value_arg('project_type'),
+        'departments': parse_multi_value_arg('department'),
+        'managers': parse_multi_value_arg('manager'),
+        'project_no': request.args.get('project_no', '').strip(),
+        'contract_no': request.args.get('contract_no', '').strip(),
+        'client': request.args.get('client', '').strip()
+    }
+
+
+def build_project_filter_sql(filters):
+    clauses = []
+    params = []
+
+    if filters['types']:
+        clauses.append("project_type IN ({})".format(', '.join(['%s'] * len(filters['types']))))
+        params.extend(filters['types'])
+    if filters['departments']:
+        clauses.append("department IN ({})".format(', '.join(['%s'] * len(filters['departments']))))
+        params.extend(filters['departments'])
+    if filters['managers']:
+        clauses.append("manager IN ({})".format(', '.join(['%s'] * len(filters['managers']))))
+        params.extend(filters['managers'])
+    if filters['project_no']:
+        clauses.append("project_no LIKE %s")
+        params.append(f"%{filters['project_no']}%")
+    if filters['contract_no']:
+        clauses.append("related_contract_no LIKE %s")
+        params.append(f"%{filters['contract_no']}%")
+    if filters['client']:
+        clauses.append("client LIKE %s")
+        params.append(f"%{filters['client']}%")
+
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ''
+    return where_sql, params
+
+
+def get_dashboard_page():
+    try:
+        page = int(request.args.get('page', '1'))
+    except ValueError:
+        page = 1
+    return max(page, 1)
+
+
+def get_page_size():
+    try:
+        page_size = int(request.args.get('page_size', str(config.PAGE_SIZE)))
+    except ValueError:
+        page_size = config.PAGE_SIZE
+    return min(max(page_size, 10), config.MAX_PAGE_SIZE)
+
+
+def get_manager_options():
+    conn = get_db_connection()
+    if not conn:
+        return []
+
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT DISTINCT manager
+                FROM projects
+                WHERE manager IS NOT NULL AND manager != ''
+                ORDER BY manager ASC
+            """)
+            return [row['manager'] for row in cursor.fetchall()]
+    except Exception as e:
+        print(f"[负责人] 读取失败: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+def ensure_runtime_indexes(conn):
+    """为高频筛选字段补齐索引，减少全表扫描压力。"""
+    desired_indexes = {
+        'idx_project_type': "CREATE INDEX idx_project_type ON projects (project_type)",
+        'idx_department': "CREATE INDEX idx_department ON projects (department)",
+        'idx_manager': "CREATE INDEX idx_manager ON projects (manager)",
+        'idx_status': "CREATE INDEX idx_status ON projects (status)",
+        'idx_related_contract_no': "CREATE INDEX idx_related_contract_no ON projects (related_contract_no)"
+    }
+
+    with conn.cursor() as cursor:
+        for index_name, ddl in desired_indexes.items():
+            cursor.execute("""
+                SELECT COUNT(*) AS count
+                FROM information_schema.statistics
+                WHERE table_schema = %s
+                  AND table_name = 'projects'
+                  AND index_name = %s
+            """, (config.MYSQL_DATABASE, index_name))
+            if cursor.fetchone()['count'] == 0:
+                cursor.execute(ddl)
+        conn.commit()
 
 
 # ==================== 数据库检查 ====================
@@ -127,6 +504,8 @@ def check_database():
                                """, ('admin', 'admin123', '系统管理员', '质控部'))
                 conn.commit()
                 print("[系统] 已创建默认管理员账号: admin/admin123，部门：质控部")
+
+            ensure_runtime_indexes(conn)
 
         return True, "数据库检查完成"
 
@@ -213,6 +592,10 @@ def generate_project_no(project_type):
 # ==================== 数据统计函数 ====================
 def get_statistics():
     """获取项目统计信息"""
+    cached_stats = stats_cache.get('dashboard_stats')
+    if cached_stats is not None:
+        return cached_stats
+
     conn = get_db_connection()
     if not conn:
         return {}
@@ -270,6 +653,7 @@ def get_statistics():
                            """)
             stats['month'] = cursor.fetchone()['count'] or 0
 
+            stats_cache.set('dashboard_stats', stats)
             return stats
 
     except Exception as e:
@@ -278,6 +662,52 @@ def get_statistics():
     finally:
         if conn:
             conn.close()
+
+
+def query_projects_page(filters, page, page_size):
+    """按筛选条件分页查询项目，避免一次性加载全表。"""
+    conn = get_db_connection()
+    if not conn:
+        return [], 0
+
+    try:
+        where_sql, params = build_project_filter_sql(filters)
+        with conn.cursor() as cursor:
+            cursor.execute(f"SELECT COUNT(*) AS count FROM projects {where_sql}", params)
+            total = cursor.fetchone()['count'] or 0
+            total_pages = max(1, math.ceil(total / page_size)) if total else 1
+            safe_page = min(page, total_pages)
+            offset = (safe_page - 1) * page_size
+
+            cursor.execute(f"""
+                SELECT id,
+                       project_no,
+                       project_name,
+                       project_type,
+                       status,
+                       manager,
+                       business_execution_partner,
+                       department,
+                       estimated_fee,
+                       client,
+                       evaluation_object,
+                       project_date,
+                       base_date,
+                       related_contract_no,
+                       remark,
+                       DATE_FORMAT(created_date, '%%Y/%%m/%%d %%H:%%i') AS created_date
+                FROM projects
+                {where_sql}
+                ORDER BY created_date DESC
+                LIMIT %s OFFSET %s
+            """, params + [page_size, offset])
+            rows = [normalize_record(project) for project in cursor.fetchall()]
+            return rows, total, safe_page
+    except Exception as e:
+        print(f"[分页查询] 错误: {e}")
+        return [], 0, 1
+    finally:
+        conn.close()
 
 
 # ==================== Flask路由 ====================
@@ -352,58 +782,43 @@ def dashboard():
 
     projects = []
     stats = {}
+    total_projects = 0
+    page_size = get_page_size()
+    requested_page = get_dashboard_page()
+    filter_state = get_filter_state()
+    manager_options = get_manager_options()
 
-    conn = get_db_connection()
-    if conn:
-        try:
-            with conn.cursor() as cursor:
-                # 获取项目列表（包含状态字段）
-                cursor.execute("""
-                               SELECT id,
-                                      project_no,
-                                      project_name,
-                                      project_type,
-                                      status,
-                                      manager,
-                                      business_execution_partner,
-                                      department,
-                                      estimated_fee,
-                                      client,
-                                      evaluation_object,
-                                      project_date,
-                                      base_date,
-                                      related_contract_no,
-                                      remark,
-                                      DATE_FORMAT(created_date, '%Y/%m/%d %H:%i') as created_date
-                               FROM projects
-                               ORDER BY created_date DESC
-                               """)
+    try:
+        projects, total_projects, current_page = query_projects_page(filter_state, requested_page, page_size)
+        stats = get_statistics()
+    except Exception as e:
+        print(f"[查询] 错误: {e}")
+        current_page = 1
+        flash('获取数据时出错', 'error')
 
-                # 直接获取字典格式的结果
-                projects = cursor.fetchall()
-
-                # 转换None值为空字符串
-                for project in projects:
-                    for key in project:
-                        if project[key] is None:
-                            project[key] = ''
-
-            # 获取统计信息
-            stats = get_statistics()
-
-        except Exception as e:
-            print(f"[查询] 错误: {e}")
-            flash('获取数据时出错', 'error')
-        finally:
-            conn.close()
+    total_pages = max(1, math.ceil(total_projects / page_size)) if total_projects else 1
+    pagination = {
+        'page': current_page,
+        'page_size': page_size,
+        'total': total_projects,
+        'total_pages': total_pages,
+        'has_prev': current_page > 1,
+        'has_next': current_page < total_pages,
+        'start': ((current_page - 1) * page_size + 1) if total_projects else 0,
+        'end': min(current_page * page_size, total_projects)
+    }
 
     return render_template('dashboard.html',
                            user=session,
                            projects=projects,
+                           total_projects=total_projects,
                            stats=stats,
                            evaluation_types=config.EVALUATION_TYPES,
                            departments=config.DEPARTMENTS,
-                           project_year=config.PROJECT_YEAR)
+                           project_year=config.PROJECT_YEAR,
+                           manager_options=manager_options,
+                           filter_state=filter_state,
+                           pagination=pagination)
 
 
 @app.route('/api/check_duplicate')
@@ -571,6 +986,7 @@ def create_project():
                                ))
 
                 conn.commit()
+                invalidate_runtime_caches()
                 flash(f'✅ 项目创建成功！项目号：{project_no}', 'success')
 
         except pymysql.IntegrityError as e:
@@ -657,6 +1073,7 @@ def edit_project(project_id):
                            ))
 
             conn.commit()
+            invalidate_runtime_caches()
             
             # 返回更新后的数据用于前端刷新UI
             cursor.execute("""
@@ -711,6 +1128,7 @@ def delete_project(project_id):
             # 删除项目
             cursor.execute("DELETE FROM projects WHERE id = %s", (project_id,))
             conn.commit()
+            invalidate_runtime_caches()
             flash(f'项目 {project["project_no"]} 已删除', 'info')
 
     except Exception as e:
@@ -736,6 +1154,7 @@ def api_invalidate_project(project_id):
         with conn.cursor() as cursor:
             cursor.execute("UPDATE projects SET status = 'invalid' WHERE id = %s", (project_id,))
             conn.commit()
+            invalidate_runtime_caches()
             return jsonify({'success': True, 'message': '项目已作废'})
     except Exception as e:
         conn.rollback()
@@ -807,6 +1226,7 @@ def api_delete_project(project_id):
 
             cursor.execute("DELETE FROM projects WHERE id = %s", (project_id,))
             conn.commit()
+            invalidate_runtime_caches()
             return jsonify({'success': True, 'message': f'项目 {project["project_no"]} 已删除'})
     except Exception as e:
         conn.rollback()
@@ -818,7 +1238,7 @@ def api_delete_project(project_id):
 # ---------- 导出Excel ----------
 @app.route('/export/projects')
 def export_projects():
-    """导出项目列表到Excel"""
+    """按筛选条件分批导出项目列表，避免DataFrame占用大量内存。"""
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
@@ -828,78 +1248,138 @@ def export_projects():
         return redirect(url_for('dashboard'))
 
     try:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                           SELECT 
-                                  project_no as '项目号',
-                                  project_name as '项目名称',
-                                  client as '委托方',
-                                  project_type as '评估类型',
-                                  manager as '项目负责人',
-                                  business_execution_partner as '业务执行合伙人',
-                                  related_contract_no as '关联合同号',
-                                  department as '所属部门',
-                                  estimated_fee as '预计收费金额',
-                                  CASE 
-                                    WHEN status = 'active' THEN '有效'
-                                    WHEN status = 'invalid' THEN '已作废'
-                                    ELSE status 
-                                  END as '状态',
-                                  project_date as '立项日期',
-                                  base_date as '评估基准日',
-                                  evaluation_object as '评估对象',
-                                  evaluation_scope as '评估范围',
-                                  purpose as '经济行为目的',
-                                  remark as '备注',
-                                  created_by as '创建人',
-                                  DATE_FORMAT(created_date, '%Y-%m-%d %H:%i:%s') as '创建时间'
-                           FROM projects
-                           ORDER BY created_date DESC
-                           """)
-            projects = cursor.fetchall()
+        filters = get_filter_state()
+        where_sql, params = build_project_filter_sql(filters)
 
-        if not projects:
+        with conn.cursor() as cursor:
+            cursor.execute(f"SELECT COUNT(*) AS count FROM projects {where_sql}", params)
+            total_rows = cursor.fetchone()['count'] or 0
+
+        if total_rows == 0:
             flash('没有可导出的数据', 'info')
             return redirect(url_for('dashboard'))
 
-        # 转换为DataFrame
-        df = pd.DataFrame(projects)
-        
-        # 增加自然序号列 (倒序序号：最新条目序号最大)
-        df.insert(0, '序号', range(len(df), 0, -1))
+        columns = [
+            ('project_no', '项目号'),
+            ('project_name', '项目名称'),
+            ('client', '委托方'),
+            ('project_type', '评估类型'),
+            ('manager', '项目负责人'),
+            ('business_execution_partner', '业务执行合伙人'),
+            ('related_contract_no', '关联合同号'),
+            ('department', '所属部门'),
+            ('estimated_fee', '预计收费金额'),
+            ('status_text', '状态'),
+            ('project_date', '立项日期'),
+            ('base_date', '评估基准日'),
+            ('evaluation_object', '评估对象'),
+            ('evaluation_scope', '评估范围'),
+            ('purpose', '经济行为目的'),
+            ('remark', '备注'),
+            ('created_by', '创建人'),
+            ('created_date', '创建时间')
+        ]
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
+        temp_file.close()
 
-        # 创建内存中的字节流
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            df.to_excel(writer, index=False, sheet_name='项目列表')
-            
-            # 获取xlsxwriter对象以设置样式
-            workbook = writer.book
-            worksheet = writer.sheets['项目列表']
-            
-            # 设置列宽
-            header_format = workbook.add_format({'bold': True, 'bg_color': '#D7E4BC', 'border': 1})
-            for col_num, value in enumerate(df.columns.values):
-                worksheet.write(0, col_num, value, header_format)
-                # 改进的列宽计算，处理可能出现的类型错误
-                try:
-                    # 获取该列所有值的最大长度
-                    max_val_len = df[value].apply(lambda x: len(str(x)) if pd.notnull(x) else 0).max()
-                    # 与表头长度比较
-                    column_len = max(max_val_len, len(str(value))) + 2
-                except:
-                    # 如果计算失败，使用默认宽度
-                    column_len = 20
-                worksheet.set_column(col_num, col_num, min(column_len, 50))
+        workbook = xlsxwriter.Workbook(temp_file.name, {'constant_memory': True})
+        worksheet = workbook.add_worksheet('项目列表')
+        header_format = workbook.add_format({'bold': True, 'bg_color': '#D7E4BC', 'border': 1})
+        text_wrap_format = workbook.add_format({'text_wrap': True, 'valign': 'top'})
+        money_format = workbook.add_format({'num_format': '#,##0.00'})
 
-        output.seek(0)
-        
-        # 文件命名：项目列表_导出_YYYYMMDD.xlsx
+        column_widths = {'序号': len('序号') + 2}
+        worksheet.write(0, 0, '序号', header_format)
+        for col_idx, (_field_name, header) in enumerate(columns, start=1):
+            worksheet.write(0, col_idx, header, header_format)
+            column_widths[header] = len(header) + 2
+
+        stream_conn = get_db_connection()
+        if not stream_conn:
+            workbook.close()
+            os.unlink(temp_file.name)
+            flash('数据库连接失败', 'error')
+            return redirect(url_for('dashboard'))
+
+        try:
+            with stream_conn.cursor(pymysql.cursors.SSDictCursor) as cursor:
+                cursor.execute(f"""
+                    SELECT project_no,
+                           project_name,
+                           client,
+                           project_type,
+                           manager,
+                           business_execution_partner,
+                           related_contract_no,
+                           department,
+                           estimated_fee,
+                           CASE
+                               WHEN status = 'active' THEN '有效'
+                               WHEN status = 'invalid' THEN '已作废'
+                               ELSE status
+                           END AS status_text,
+                           project_date,
+                           base_date,
+                           evaluation_object,
+                           evaluation_scope,
+                           purpose,
+                           remark,
+                           created_by,
+                           DATE_FORMAT(created_date, '%%Y-%%m-%%d %%H:%%i:%%s') AS created_date
+                    FROM projects
+                    {where_sql}
+                    ORDER BY created_date DESC
+                """, params)
+
+                row_idx = 1
+                seq_no = total_rows
+                while True:
+                    batch = cursor.fetchmany(config.EXPORT_FETCH_BATCH_SIZE)
+                    if not batch:
+                        break
+
+                    for row in batch:
+                        worksheet.write(row_idx, 0, seq_no)
+                        column_widths['序号'] = max(column_widths['序号'], len(str(seq_no)) + 2)
+                        seq_no -= 1
+
+                        for col_idx, (field_name, header) in enumerate(columns, start=1):
+                            value = row.get(field_name, '')
+                            if value is None:
+                                value = ''
+
+                            cell_format = text_wrap_format
+                            if field_name == 'estimated_fee' and value not in ('', None):
+                                worksheet.write_number(row_idx, col_idx, float(value), money_format)
+                                value_for_width = f"{float(value):,.2f}"
+                            else:
+                                value_for_width = str(value)
+                                worksheet.write(row_idx, col_idx, value_for_width, cell_format)
+
+                            column_widths[header] = min(max(column_widths[header], len(value_for_width) + 2), 50)
+
+                        row_idx += 1
+        finally:
+            stream_conn.close()
+
+        for col_idx, header in enumerate(['序号'] + [header for _field_name, header in columns]):
+            worksheet.set_column(col_idx, col_idx, column_widths[header])
+
+        workbook.close()
+
         timestamp = datetime.now().strftime('%Y%m%d')
         filename = f"项目列表_导出_{timestamp}.xlsx"
 
+        @after_this_request
+        def remove_temp_export_file(response):
+            try:
+                os.remove(temp_file.name)
+            except OSError:
+                pass
+            return response
+
         return send_file(
-            output,
+            temp_file.name,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             as_attachment=True,
             download_name=filename
@@ -911,6 +1391,16 @@ def export_projects():
         return redirect(url_for('dashboard'))
     finally:
         conn.close()
+
+
+@app.route('/admin/system/memory')
+def admin_system_memory():
+    """管理员查看运行时内存快照，用于排查内存持续上涨问题。"""
+    if 'user_id' not in session:
+        return jsonify({'error': '未登录'}), 401
+    if session.get('username') != 'admin':
+        return jsonify({'error': '无权限'}), 403
+    return jsonify({'success': True, 'report': collect_memory_report()})
 
 
 # ---------- API接口 ----------
@@ -1026,6 +1516,7 @@ def add_user():
                            """, (username, password, realname, department))
 
             conn.commit()
+            invalidate_runtime_caches()
             flash(f'用户 {realname} 添加成功', 'success')
 
     except Exception as e:
@@ -1035,6 +1526,15 @@ def add_user():
         conn.close()
 
     return redirect(url_for('dashboard'))
+
+
+@app.after_request
+def trim_runtime_memory(response):
+    """内存逼近阈值时主动清缓存并触发GC，降低持续爬升风险。"""
+    if get_process_memory_mb() >= config.MEMORY_SOFT_LIMIT_MB:
+        invalidate_runtime_caches()
+        gc.collect()
+    return response
 
 
 # ==================== MySQL建表SQL ====================

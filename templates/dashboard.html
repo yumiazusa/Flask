@@ -1030,12 +1030,14 @@
                 <span class="icon">📋</span>
                 <span>项目列表</span>
                 <span style="margin-left: auto; font-size: 14px; color: var(--gray);">
-                    共 {{ projects|length }} 个记录
+                    共 {{ total_projects }} 个记录
                 </span>
             </div>
 
             <!-- 筛选器 -->
-            <div class="filter-container">
+            <form id="filterForm" class="filter-container" method="GET" action="{{ url_for('dashboard') }}">
+                <input type="hidden" id="pageInput" name="page" value="{{ pagination.page }}">
+                <input type="hidden" name="page_size" value="{{ pagination.page_size }}">
                 <div class="filter-group">
                     <label>评估类型：</label>
                     <div class="custom-dropdown" id="dropdownType">
@@ -1050,7 +1052,8 @@
                             <div class="dropdown-options">
                                 {% for type_name, code in evaluation_types.items() %}
                                 <div class="dropdown-option">
-                                    <input type="checkbox" value="{{ type_name }}" id="type_{{ loop.index }}">
+                                    <input type="checkbox" name="project_type" value="{{ type_name }}" id="type_{{ loop.index }}"
+                                           {% if type_name in filter_state.types %}checked{% endif %}>
                                     <label for="type_{{ loop.index }}">{{ type_name }}</label>
                                 </div>
                                 {% endfor %}
@@ -1072,27 +1075,33 @@
                             </div>
                             <div class="dropdown-options">
                                 <div class="dropdown-option">
-                                    <input type="checkbox" value="业务1组（房地产）" id="dept_1">
+                                    <input type="checkbox" name="department" value="业务1组（房地产）" id="dept_1"
+                                           {% if '业务1组（房地产）' in filter_state.departments %}checked{% endif %}>
                                     <label for="dept_1">业务1组（房地产）</label>
                                 </div>
                                 <div class="dropdown-option">
-                                    <input type="checkbox" value="业务2组（固定资产）" id="dept_2">
+                                    <input type="checkbox" name="department" value="业务2组（固定资产）" id="dept_2"
+                                           {% if '业务2组（固定资产）' in filter_state.departments %}checked{% endif %}>
                                     <label for="dept_2">业务2组（固定资产）</label>
                                 </div>
                                 <div class="dropdown-option">
-                                    <input type="checkbox" value="业务3组（企业价值）" id="dept_3">
+                                    <input type="checkbox" name="department" value="业务3组（企业价值）" id="dept_3"
+                                           {% if '业务3组（企业价值）' in filter_state.departments %}checked{% endif %}>
                                     <label for="dept_3">业务3组（企业价值）</label>
                                 </div>
                                 <div class="dropdown-option">
-                                    <input type="checkbox" value="矿业权小组" id="dept_4">
+                                    <input type="checkbox" name="department" value="矿业权小组" id="dept_4"
+                                           {% if '矿业权小组' in filter_state.departments %}checked{% endif %}>
                                     <label for="dept_4">矿业权小组</label>
                                 </div>
                                 <div class="dropdown-option">
-                                    <input type="checkbox" value="质控部" id="dept_5">
+                                    <input type="checkbox" name="department" value="质控部" id="dept_5"
+                                           {% if '质控部' in filter_state.departments %}checked{% endif %}>
                                     <label for="dept_5">质控部</label>
                                 </div>
                                 <div class="dropdown-option">
-                                    <input type="checkbox" value="其他" id="dept_6">
+                                    <input type="checkbox" name="department" value="其他" id="dept_6"
+                                           {% if '其他' in filter_state.departments %}checked{% endif %}>
                                     <label for="dept_6">其他</label>
                                 </div>
                             </div>
@@ -1112,7 +1121,13 @@
                                 <input type="text" placeholder="搜索负责人...">
                             </div>
                             <div class="dropdown-options" id="managerOptions">
-                                <!-- 由JS动态生成 -->
+                                {% for manager in manager_options %}
+                                <div class="dropdown-option">
+                                    <input type="checkbox" name="manager" value="{{ manager }}" id="mgr_{{ loop.index }}"
+                                           {% if manager in filter_state.managers %}checked{% endif %}>
+                                    <label for="mgr_{{ loop.index }}">{{ manager }}</label>
+                                </div>
+                                {% endfor %}
                             </div>
                         </div>
                     </div>
@@ -1120,30 +1135,33 @@
 
                 <div class="filter-group">
                     <label>项目号：</label>
-                    <input type="text" class="filter-input" id="filterProjectNo" placeholder="输入项目号搜索..." oninput="applyFilters()">
+                    <input type="text" class="filter-input" id="filterProjectNo" name="project_no"
+                           value="{{ filter_state.project_no }}" placeholder="输入项目号搜索...">
                 </div>
 
                 <div class="filter-group">
                     <label>合同号：</label>
-                    <input type="text" class="filter-input" id="filterContractNo" placeholder="输入合同号搜索..." oninput="applyFilters()">
+                    <input type="text" class="filter-input" id="filterContractNo" name="contract_no"
+                           value="{{ filter_state.contract_no }}" placeholder="输入合同号搜索...">
                 </div>
 
                 <div class="filter-group">
                     <label>委托方：</label>
-                    <input type="text" class="filter-input" id="filterClient" placeholder="输入委托方搜索..." oninput="applyFilters()">
+                    <input type="text" class="filter-input" id="filterClient" name="client"
+                           value="{{ filter_state.client }}" placeholder="输入委托方搜索...">
                 </div>
 
                 <div style="margin-left: auto; display: flex; gap: 10px; align-items: flex-end;">
-                    <button class="btn btn-success" onclick="handleExport()" style="padding: 8px 16px;">
+                    <button type="button" class="btn btn-success" onclick="handleExport()" style="padding: 8px 16px;">
                         <span>📊</span>
                         <span>导出Excel</span>
                     </button>
-                    <button class="btn" onclick="resetFilters()" style="padding: 8px 16px;">
+                    <button type="button" class="btn" onclick="resetFilters()" style="padding: 8px 16px;">
                         <span>🔄</span>
                         <span>重置</span>
                     </button>
                 </div>
-            </div>
+            </form>
 
             {% if projects %}
             <div class="table-container">
@@ -1179,7 +1197,7 @@
                             data-manager="{{ project.manager or '' }}"
                             data-status="{{ project.status or 'active' }}"
                             class="{{ 'row-invalid' if project.status == 'invalid' else '' }}">
-                            <td class="seq-num">{{ projects|length - loop.index + 1 }}</td>
+                            <td class="seq-num">{{ pagination.total - ((pagination.page - 1) * pagination.page_size) - loop.index0 }}</td>
                             <td>
                                 <span class="project-no">{{ project.project_no }}</span>
                             </td>
@@ -1211,15 +1229,15 @@
                             <td style="position: sticky; right: 0; background: white; z-index: 15; box-shadow: -2px 0 5px rgba(0,0,0,0.05);">
                                 <div class="action-buttons">
                                     {% if project.status != 'invalid' %}
-                                    <button class="btn btn-warning btn-sm" onclick="editProject({{ project.id }})">
+                                    <button type="button" class="btn btn-warning btn-sm" onclick="editProject({{ project.id }})">
                                         <span>✏️</span>
                                         <span>编辑</span>
                                     </button>
-                                    <button class="btn btn-danger btn-sm" onclick="handleDelete({{ project.id }}, '{{ project.project_no }}')">
+                                    <button type="button" class="btn btn-danger btn-sm" onclick="handleDelete({{ project.id }}, '{{ project.project_no }}')">
                                         <span>🗑️</span>
                                         <span>删除</span>
                                     </button>
-                                    <button class="btn btn-sm" onclick="confirmInvalidate({{ project.id }}, '{{ project.project_no }}')" style="background: #95a5a6; color: white;">
+                                    <button type="button" class="btn btn-sm" onclick="confirmInvalidate({{ project.id }}, '{{ project.project_no }}')" style="background: #95a5a6; color: white;">
                                         <span>🚫</span>
                                         <span>作废</span>
                                     </button>
@@ -1232,6 +1250,18 @@
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px;">
+                <div style="font-size: 14px; color: #666;">
+                    当前显示 {{ pagination.start }} - {{ pagination.end }} 条，共 {{ pagination.total }} 条
+                </div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button type="button" class="btn" onclick="submitFilterForm(1)" {% if not pagination.has_prev %}disabled{% endif %}>首页</button>
+                    <button type="button" class="btn" onclick="submitFilterForm({{ pagination.page - 1 }})" {% if not pagination.has_prev %}disabled{% endif %}>上一页</button>
+                    <button type="button" class="btn" disabled>第 {{ pagination.page }} / {{ pagination.total_pages }} 页</button>
+                    <button type="button" class="btn" onclick="submitFilterForm({{ pagination.page + 1 }})" {% if not pagination.has_next %}disabled{% endif %}>下一页</button>
+                    <button type="button" class="btn" onclick="submitFilterForm({{ pagination.total_pages }})" {% if not pagination.has_next %}disabled{% endif %}>末页</button>
+                </div>
             </div>
             {% else %}
             <div class="empty-state">
@@ -1418,6 +1448,57 @@
         // 类型代码映射
         const typeCodeMap = JSON.parse('{{ evaluation_types|tojson|safe }}');
         const projectYear = '{{ project_year }}';
+        const appState = {
+            currentDuplicates: null,
+            pendingRequests: new Map(),
+            filterTimer: null
+        };
+
+        function abortPendingRequest(requestKey) {
+            const controller = appState.pendingRequests.get(requestKey);
+            if (controller) {
+                controller.abort();
+                appState.pendingRequests.delete(requestKey);
+            }
+        }
+
+        function fetchJson(url, options = {}, requestKey = null) {
+            let controller = null;
+            if (requestKey) {
+                abortPendingRequest(requestKey);
+                controller = new AbortController();
+                appState.pendingRequests.set(requestKey, controller);
+                options.signal = controller.signal;
+            }
+
+            return fetch(url, options)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('网络响应错误');
+                    }
+                    return response.json();
+                })
+                .finally(() => {
+                    if (requestKey) {
+                        appState.pendingRequests.delete(requestKey);
+                    }
+                });
+        }
+
+        function submitFilterForm(page = 1) {
+            const form = document.getElementById('filterForm');
+            if (!form) return;
+            document.getElementById('pageInput').value = page;
+            form.submit();
+        }
+
+        function scheduleFilterSubmit(resetPage = true) {
+            if (resetPage) {
+                document.getElementById('pageInput').value = '1';
+            }
+            clearTimeout(appState.filterTimer);
+            appState.filterTimer = setTimeout(() => submitFilterForm(document.getElementById('pageInput').value), 300);
+        }
 
         // 更新项目号预览
         function updateProjectNoPreview() {
@@ -1429,13 +1510,7 @@
                 const code = typeCodeMap[selectedType];
 
                 // 调用API获取下一个项目号
-                fetch(`/api/next_project_no/${encodeURIComponent(selectedType)}`)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('网络响应错误');
-                        }
-                        return response.json();
-                    })
+                fetchJson(`/api/next_project_no/${encodeURIComponent(selectedType)}`, {}, 'next-project-no')
                     .then(data => {
                         if (data.success) {
                             preview.value = data.project_no;
@@ -1459,13 +1534,7 @@
         // 编辑项目
         function editProject(projectId) {
             // 获取项目详情
-            fetch(`/api/project/${projectId}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('网络响应错误');
-                    }
-                    return response.json();
-                })
+            fetchJson(`/api/project/${projectId}`, {}, `project-${projectId}`)
                 .then(data => {
                     if (data.success) {
                         const project = data.project;
@@ -1515,7 +1584,10 @@
         function executeExport() {
             const today = new Date().toISOString().split('T')[0];
             localStorage.setItem('lastExportDate', today);
-            window.location.href = '/export/projects';
+            const form = document.getElementById('filterForm');
+            const params = new URLSearchParams(new FormData(form));
+            params.delete('page');
+            window.location.href = `/export/projects?${params.toString()}`;
         }
 
         // 处理编辑表单提交 (AJAX)
@@ -1524,14 +1596,12 @@
             const projectId = document.getElementById('editProjectId').value;
             const formData = new FormData(this);
 
-            fetch(`/project/${projectId}/edit`, {
+            fetchJson(`/project/${projectId}/edit`, {
                 method: 'POST',
                 body: formData
-            })
-            .then(response => response.json())
+            }, `edit-submit-${projectId}`)
             .then(data => {
                 if (data.success) {
-                    // 立即刷新页面
                     alert(data.message);
                     window.location.reload();
                 } else {
@@ -1544,55 +1614,6 @@
             });
         });
 
-        // 更新表格行内容
-        function updateTableRow(project) {
-            const row = document.querySelector(`tr[data-id="${project.id}"]`);
-            if (!row) return;
-
-            // 更新 data 属性
-            row.setAttribute('data-project-no', project.project_no);
-            row.setAttribute('data-client', project.client || '');
-            row.setAttribute('data-manager', project.manager || '');
-            row.setAttribute('data-department', project.department || '');
-            row.setAttribute('data-contract-no', project.related_contract_no || '');
-            row.setAttribute('data-status', project.status);
-
-            // 更新单元格内容
-            const cells = row.cells;
-            cells[1].querySelector('.project-no').textContent = project.project_no;
-            cells[2].textContent = project.project_name;
-            cells[2].title = project.project_name;
-            cells[3].textContent = project.client || '-';
-            cells[4].textContent = project.related_contract_no || '-';
-            cells[5].textContent = project.project_type;
-            
-            // 状态列 (Index 6)
-            const statusCell = cells[6];
-            if (project.status === 'invalid') {
-                statusCell.innerHTML = '<span class="status-tag status-invalid">已作废</span>';
-                row.classList.add('row-invalid');
-                // 更新操作列为不可操作
-                row.cells[row.cells.length-1].innerHTML = '<span style="color: #999; font-size: 12px;">不可操作</span>';
-            } else {
-                statusCell.innerHTML = '<span class="status-tag status-active">有效</span>';
-                row.classList.remove('row-invalid');
-            }
-
-            cells[7].textContent = project.manager;
-            cells[8].textContent = project.business_execution_partner || '-';
-            cells[9].textContent = project.department || '-';
-            
-            // 金额列
-            const fee = parseFloat(project.estimated_fee);
-            cells[10].innerHTML = fee > 0 ? `<span class="amount">¥${fee.toLocaleString('zh-CN', {minimumFractionDigits: 2})}</span>` : '-';
-            
-            cells[11].textContent = project.project_date || '-';
-            cells[12].textContent = project.base_date || '-';
-            cells[14].textContent = project.remark || '-';
-            
-            applyFilters(); // 重新应用筛选
-        }
-
         // 作废确认
         function confirmInvalidate(projectId, projectNo) {
             const modal = document.getElementById('invalidateModal');
@@ -1600,17 +1621,11 @@
             
             const confirmBtn = document.getElementById('confirmInvalidateBtn');
             confirmBtn.onclick = function() {
-                fetch(`/api/project/${projectId}/invalidate`, { method: 'POST' })
-                    .then(response => response.json())
+                fetchJson(`/api/project/${projectId}/invalidate`, { method: 'POST' }, `invalidate-${projectId}`)
                     .then(data => {
                         if (data.success) {
-                            // 重新获取项目数据并更新UI
-                            fetch(`/api/project/${projectId}`)
-                                .then(res => res.json())
-                                .then(d => {
-                                    if (d.success) updateTableRow(d.project);
-                                });
                             closeInvalidateModal();
+                            window.location.reload();
                         } else {
                             alert('操作失败: ' + data.error);
                         }
@@ -1622,12 +1637,12 @@
 
         function closeInvalidateModal() {
             document.getElementById('invalidateModal').style.display = 'none';
+            document.getElementById('confirmInvalidateBtn').onclick = null;
         }
 
         // 处理删除逻辑 (前置校验)
         function handleDelete(projectId, projectNo) {
-            fetch(`/api/project/${projectId}/check_delete`)
-                .then(response => response.json())
+            fetchJson(`/api/project/${projectId}/check_delete`, {}, `check-delete-${projectId}`)
                 .then(data => {
                     const modal = document.getElementById('deleteModal');
                     const title = document.getElementById('deleteModalTitle');
@@ -1655,15 +1670,12 @@
         }
 
         function executeDelete(projectId) {
-            fetch(`/api/project/${projectId}/delete`, { method: 'POST' })
-                .then(response => response.json())
+            fetchJson(`/api/project/${projectId}/delete`, { method: 'POST' }, `delete-${projectId}`)
                 .then(data => {
                     if (data.success) {
-                        const row = document.querySelector(`tr[data-id="${projectId}"]`);
-                        if (row) row.remove();
-                        applyFilters();
                         closeDeleteModal();
                         alert(data.message);
+                        window.location.reload();
                     } else {
                         alert('删除失败: ' + data.error);
                     }
@@ -1672,6 +1684,7 @@
 
         function closeDeleteModal() {
             document.getElementById('deleteModal').style.display = 'none';
+            document.getElementById('deleteConfirmBtn').onclick = null;
         }
 
         // 确认删除项目 (旧版本，保留引用)
@@ -1693,43 +1706,6 @@
             }
         }
 
-        // 统一筛选逻辑
-        function applyFilters() {
-            const selectedTypes = getSelectedValues('dropdownType');
-            const selectedDepts = getSelectedValues('dropdownDept');
-            const selectedManagers = getSelectedValues('dropdownManager');
-            
-            const projectNoValue = document.getElementById('filterProjectNo').value.toLowerCase();
-            const contractNoValue = document.getElementById('filterContractNo').value.toLowerCase();
-            const clientValue = document.getElementById('filterClient').value.toLowerCase();
-
-            const rows = document.querySelectorAll('#projectTable tbody tr');
-
-            rows.forEach(row => {
-                const rowType = row.getAttribute('data-type');
-                const rowDept = row.getAttribute('data-department');
-                const rowManager = row.getAttribute('data-manager');
-                const rowProjectNo = row.getAttribute('data-project-no').toLowerCase();
-                const rowContractNo = row.getAttribute('data-contract-no').toLowerCase();
-                const rowClient = row.getAttribute('data-client').toLowerCase();
-
-                const matchesType = selectedTypes.length === 0 || selectedTypes.includes(rowType);
-                const matchesDept = selectedDepts.length === 0 || selectedDepts.includes(rowDept);
-                const matchesManager = selectedManagers.length === 0 || selectedManagers.includes(rowManager);
-                const matchesProjectNo = !projectNoValue || rowProjectNo.includes(projectNoValue);
-                const matchesContractNo = !contractNoValue || rowContractNo.includes(contractNoValue);
-                const matchesClient = !clientValue || rowClient.includes(clientValue);
-
-                if (matchesType && matchesDept && matchesManager && matchesProjectNo && matchesContractNo && matchesClient) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
-            });
-
-            updateVisibleCount();
-        }
-
         // 获取选中的值
         function getSelectedValues(dropdownId) {
             const dropdown = document.getElementById(dropdownId);
@@ -1742,6 +1718,12 @@
             const dropdowns = document.querySelectorAll('.custom-dropdown');
             
             dropdowns.forEach(dropdown => {
+                if (dropdown.dataset.initialized === 'true') {
+                    updateDropdownText(dropdown);
+                    return;
+                }
+                dropdown.dataset.initialized = 'true';
+
                 const toggle = dropdown.querySelector('.dropdown-toggle');
                 const searchInput = dropdown.querySelector('.dropdown-search input');
                 const optionsContainer = dropdown.querySelector('.dropdown-options');
@@ -1777,14 +1759,19 @@
                 // 处理选项变更
                 optionsContainer.addEventListener('change', () => {
                     updateDropdownText(dropdown);
-                    applyFilters();
+                    scheduleFilterSubmit(true);
                 });
+
+                updateDropdownText(dropdown);
             });
 
             // 点击外部关闭
-            document.addEventListener('click', () => {
-                dropdowns.forEach(d => d.classList.remove('active'));
-            });
+            if (!document.body.dataset.dropdownDocumentBound) {
+                document.body.dataset.dropdownDocumentBound = 'true';
+                document.addEventListener('click', () => {
+                    dropdowns.forEach(d => d.classList.remove('active'));
+                });
+            }
         }
 
         // 更新下拉框显示文字
@@ -1803,79 +1790,14 @@
             }
         }
 
-        // 初始化负责人选项
-        function initManagerOptions() {
-            const managers = new Set();
-            const rows = document.querySelectorAll('#projectTable tbody tr');
-            rows.forEach(row => {
-                const manager = row.getAttribute('data-manager');
-                if (manager) managers.add(manager);
-            });
-
-            const container = document.getElementById('managerOptions');
-            container.innerHTML = '';
-            
-            Array.from(managers).sort().forEach((manager, index) => {
-                const div = document.createElement('div');
-                div.className = 'dropdown-option';
-                div.innerHTML = `
-                    <input type="checkbox" value="${manager}" id="mgr_${index}">
-                    <label for="mgr_${index}">${manager}</label>
-                `;
-                container.appendChild(div);
-            });
-        }
-
         // 重置筛选
         function resetFilters() {
-            const checkboxes = document.querySelectorAll('.custom-dropdown input[type="checkbox"]');
-            checkboxes.forEach(cb => cb.checked = false);
-            
-            const dropdowns = document.querySelectorAll('.custom-dropdown');
-            dropdowns.forEach(d => updateDropdownText(d));
-
-            document.getElementById('filterProjectNo').value = '';
-            document.getElementById('filterContractNo').value = '';
-            document.getElementById('filterClient').value = '';
-            
-            applyFilters();
+            window.location.href = '{{ url_for('dashboard') }}';
         }
-
-        // 更新可见项目数
-        function updateVisibleCount() {
-            const rows = document.querySelectorAll('#projectTable tbody tr');
-            const visibleRows = Array.from(rows).filter(row => row.style.display !== 'none');
-            
-            // 重新计算自然序号 (倒序显示：第一行显示当前可见条目的总数)
-            visibleRows.forEach((row, index) => {
-                const seqCell = row.querySelector('.seq-num');
-                if (seqCell) {
-                    seqCell.textContent = visibleRows.length - index;
-                }
-            });
-
-            // 更新页面显示的共计记录数
-            const countSpan = document.querySelector('.card-title span[style*="margin-left: auto"]');
-            if (countSpan) {
-                countSpan.textContent = `共 ${visibleRows.length} 个记录`;
-            }
-        }
-
-        // 点击模态框外部关闭
-        window.onclick = function(event) {
-            const editModal = document.getElementById('editModal');
-            const invalidateModal = document.getElementById('invalidateModal');
-            const deleteModal = document.getElementById('deleteModal');
-            
-            if (event.target === editModal) closeModal();
-            if (event.target === invalidateModal) closeInvalidateModal();
-            if (event.target === deleteModal) closeDeleteModal();
-        };
 
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', function() {
             // 初始化自定义下拉框
-            initManagerOptions();
             initCustomDropdowns();
 
             // 绑定事件
@@ -1883,6 +1805,23 @@
             if (typeSelect) {
                 typeSelect.addEventListener('change', updateProjectNoPreview);
             }
+
+            ['filterProjectNo', 'filterContractNo', 'filterClient'].forEach(id => {
+                const input = document.getElementById(id);
+                if (input) {
+                    input.addEventListener('input', () => scheduleFilterSubmit(true));
+                }
+            });
+
+            document.addEventListener('click', function(event) {
+                if (event.target.classList.contains('modal')) {
+                    if (event.target.id === 'editModal') closeModal();
+                    if (event.target.id === 'invalidateModal') closeInvalidateModal();
+                    if (event.target.id === 'deleteModal') closeDeleteModal();
+                    if (event.target.id === 'duplicateWarningModal') closeDuplicateWarningModal();
+                    if (event.target.id === 'duplicateDetailsModal') cancelSubmission();
+                }
+            });
 
             // 表单验证与提交逻辑
             const form = document.getElementById('projectForm');
@@ -1939,12 +1878,11 @@
                         estimated_fee: estimatedFee
                     });
 
-                    fetch(`/api/check_duplicate?${params.toString()}`)
-                        .then(response => response.json())
+                    fetchJson(`/api/check_duplicate?${params.toString()}`, {}, 'check-duplicate')
                         .then(data => {
                             if (data.success && data.duplicates && data.duplicates.length > 0) {
                                 // 发现重复，保存数据并弹窗
-                                window.currentDuplicates = data.duplicates;
+                                appState.currentDuplicates = data.duplicates;
                                 document.getElementById('duplicateWarningModal').style.display = 'flex';
                             } else {
                                 // 无重复，直接提交
@@ -1965,8 +1903,7 @@
                 projectTypeSelect.focus();
             }
 
-            // 初始化可见项目数
-            updateVisibleCount();
+            document.querySelectorAll('.custom-dropdown').forEach(updateDropdownText);
         });
 
         // ---------------- 重复校验相关函数 ----------------
@@ -1981,8 +1918,8 @@
             const tbody = document.getElementById('duplicateTableBody');
             tbody.innerHTML = '';
 
-            if (window.currentDuplicates) {
-                window.currentDuplicates.forEach(item => {
+            if (appState.currentDuplicates) {
+                appState.currentDuplicates.forEach(item => {
                     const tr = document.createElement('tr');
                     
                     let statusHtml = '<span class="status-tag status-active">有效</span>';
@@ -2012,23 +1949,27 @@
         function cancelSubmission() {
             document.getElementById('duplicateDetailsModal').style.display = 'none';
             // 清除暂存的重复数据
-            window.currentDuplicates = null;
+            appState.currentDuplicates = null;
         }
 
         function confirmForceSubmit() {
             const form = document.getElementById('projectForm');
             // 添加强制提交标记
-            const hiddenInput = document.createElement('input');
-            hiddenInput.type = 'hidden';
-            hiddenInput.name = 'force_submit';
+            let hiddenInput = form.querySelector('input[name="force_submit"]');
+            if (!hiddenInput) {
+                hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = 'force_submit';
+                form.appendChild(hiddenInput);
+            }
             hiddenInput.value = '1';
-            form.appendChild(hiddenInput);
             
             // 标记 dataset 以跳过监听器中的校验
             form.dataset.forceSubmit = 'true';
             
             // 关闭模态框
             document.getElementById('duplicateDetailsModal').style.display = 'none';
+            appState.currentDuplicates = null;
             
             // 提交表单
             form.submit();
